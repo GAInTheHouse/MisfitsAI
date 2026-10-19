@@ -9,8 +9,10 @@
 
 /coverage/
 
-# Ignore all environment files.
-/.env*
+# Ignore all environment files except the template.
+/.env
+/.env.local
+/.env.*.local
 
 # Ignore all logfiles and tempfiles.
 /log/*
