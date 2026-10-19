@@ -1,0 +1,7 @@
+<%# locals: title: nil, class: nil %>
+<div class="rounded-[var(--radius-lg)] border p-4 <%= local_assigns[:class] %>" style="background: var(--panel-strong); border-color: var(--line);">
+  <% if local_assigns[:title].present? %>
+    <h2 class="font-medium mb-3"><%= title %></h2>
+  <% end %>
+  <%= yield %>
+</div>

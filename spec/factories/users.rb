@@ -34,6 +34,14 @@ FactoryBot.define do
         user.profile.update!(favorite_colors: %w[blue], avoided_colors: %w[orange])
       end
     end
+
+    trait :with_google do
+      provider { "google_oauth2" }
+      sequence(:uid) { |n| "google-uid-#{n}" }
+      google_access_token { "encrypted-access" }
+      google_refresh_token { "encrypted-refresh" }
+      google_token_expires_at { 1.hour.from_now }
+    end
   end
 
   factory :user_profile do

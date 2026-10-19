@@ -1,0 +1,10 @@
+<%# locals: id:, title: %>
+<dialog id="<%= id %>" class="rounded-[var(--radius-lg)] border p-0 max-w-lg w-full" style="border-color: var(--line);" data-shared--modal-target="dialog">
+  <form method="dialog" class="p-4 border-b flex justify-between items-center" style="border-color: var(--line);">
+    <h2 class="font-medium"><%= title %></h2>
+    <button type="submit" class="text-[var(--muted)]">Close</button>
+  </form>
+  <div class="p-4">
+    <%= yield %>
+  </div>
+</dialog>

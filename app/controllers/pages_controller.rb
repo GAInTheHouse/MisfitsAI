@@ -5,10 +5,10 @@ class PagesController < ApplicationController
   skip_before_action :require_onboarding!
 
   def privacy
-    render :privacy
+    render :privacy, layout: false
   end
 
   def terms
-    render :terms
+    render :terms, layout: false
   end
 end

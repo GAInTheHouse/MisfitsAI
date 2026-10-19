@@ -26,3 +26,5 @@ AI_ADAPTER=vertex bin/rails runner bin/ai_smoke
 ```
 
 Design reference: [docs/ruby_rewrite_design_doc_v2.md](docs/ruby_rewrite_design_doc_v2.md)
+
+**Phase 2:** After Phase 1 merges, start with [docs/handoff/phase-2-entry.md](docs/handoff/phase-2-entry.md). Live GCP/Heroku checks can finish in parallel.
