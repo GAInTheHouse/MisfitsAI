@@ -1,0 +1,2 @@
+<% css = local_assigns[:variant] == :ghost ? "btn-ghost" : "btn-primary" %>
+<%= tag.button(local_assigns[:label], type: local_assigns[:type] || "button", class: "#{css} #{local_assigns[:class]}") %>

@@ -1,0 +1,44 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../config/environment"
+
+client = Ai::Client.build_adapter
+kinds = Ai::Kinds::ALL
+puts "AI smoke using #{client.class.name}"
+
+FileUtils.mkdir_p(Rails.root.join("tmp/ai_smoke"))
+
+kinds.each do |kind|
+  started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  begin
+    case kind
+    when "outfit_explanation"
+      client.grounded_text(kind: kind, prompt: "Explain outfit", facts: [ { text: "Top: shirt", title: "top" } ])
+    when "receipt_structuring"
+      client.grounded_text(kind: kind, prompt: "Structure receipt", facts: [ { text: "Shirt $20", title: "line" } ])
+    when "search_rank"
+      client.rank(kind: kind, query: "shirt", records: [ { id: "1", title: "Shirt", content: "cotton" } ])
+    when "garment_extraction", "receipt_extraction", "selfie_description"
+      client.generate_json(kind: kind, prompt: "analyze", schema: { type: "object", properties: { ok: { type: "boolean" } } },
+                           images: [ Ai::Image.new(bytes: File.binread(Rails.root.join("spec/fixtures/ai/#{kind}.png")), mime_type: "image/png") ])
+    when "garment_image", "avatar_portrait"
+      img = client.generate_image(kind: kind, prompt: "product photo")
+      File.binwrite(Rails.root.join("tmp/ai_smoke/#{kind}.png"), img.bytes)
+    when "outfit_preview_subject"
+      subject = Ai::Image.new(bytes: File.binread(Rails.root.join("spec/fixtures/ai/avatar_portrait.png")), mime_type: "image/png")
+      img = client.generate_image_with_subject(kind: kind, prompt: "outfit", subject: subject)
+      File.binwrite(Rails.root.join("tmp/ai_smoke/#{kind}.png"), img.bytes)
+    when "outfit_preview_gemini"
+      img = client.generate_image_multimodal(kind: kind, prompt: "outfit", images: [])
+      File.binwrite(Rails.root.join("tmp/ai_smoke/#{kind}.png"), img.bytes)
+    end
+    ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+    puts "OK #{kind} #{ms}ms"
+  rescue StandardError => e
+    puts "FAIL #{kind} #{e.class}: #{e.message}"
+    exit 1
+  end
+end
+
+puts "All kinds passed."

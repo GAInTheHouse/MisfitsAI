@@ -1,0 +1,32 @@
+example_id                                            | status | run_time        |
+----------------------------------------------------- | ------ | --------------- |
+./spec/models/user_profile_spec.rb[1:1]               | passed | 0.00225 seconds |
+./spec/requests/authorization_spec.rb[1:1]            | passed | 0.04349 seconds |
+./spec/requests/authorization_spec.rb[1:2]            | passed | 0.02001 seconds |
+./spec/requests/authorization_spec.rb[1:3]            | passed | 0.01154 seconds |
+./spec/services/ai/call_logger_spec.rb[1:1]           | passed | 0.02732 seconds |
+./spec/services/ai/client/fake_spec.rb[1:1]           | passed | 0.02684 seconds |
+./spec/services/ai/client/fake_spec.rb[1:2]           | passed | 0.0016 seconds  |
+./spec/services/ai/client/fake_spec.rb[1:3]           | passed | 0.00141 seconds |
+./spec/services/ai/client/fake_spec.rb[1:4]           | passed | 0.00179 seconds |
+./spec/services/ai/client/fake_spec.rb[1:5]           | passed | 0.00063 seconds |
+./spec/services/ai/client/vertex_spec.rb[1:1]         | passed | 0.00669 seconds |
+./spec/services/ai/client/vertex_spec.rb[1:2]         | passed | 0.00566 seconds |
+./spec/services/ai/client/vertex_spec.rb[1:3]         | passed | 0.00462 seconds |
+./spec/services/ai/client/vertex_spec.rb[1:4]         | passed | 0.00605 seconds |
+./spec/services/ai/client/vertex_spec.rb[1:5]         | passed | 0.0059 seconds  |
+./spec/services/ai/client/vertex_spec.rb[1:6]         | passed | 0.00521 seconds |
+./spec/services/ai/client/vertex_spec.rb[1:7]         | passed | 0.01575 seconds |
+./spec/services/ai/client/vertex_spec.rb[1:8]         | passed | 0.00639 seconds |
+./spec/services/ai/client/vertex_spec.rb[1:9]         | passed | 0.00616 seconds |
+./spec/services/ai/client_spec.rb[1:1:1]              | passed | 0.005 seconds   |
+./spec/services/ai/client_spec.rb[1:1:2]              | passed | 0.03248 seconds |
+./spec/services/ai/google_token_spec.rb[1:1]          | passed | 0.00126 seconds |
+./spec/services/ai/kinds_spec.rb[1:1]                 | passed | 0.0006 seconds  |
+./spec/services/media/image_normalizer_spec.rb[1:1:1] | passed | 0.00081 seconds |
+./spec/services/media/image_normalizer_spec.rb[1:1:2] | passed | 0.00084 seconds |
+./spec/services/media/image_normalizer_spec.rb[1:2:1] | passed | 0.00385 seconds |
+./spec/services/media/safe_fetcher_spec.rb[1:1]       | passed | 0.00072 seconds |
+./spec/services/media/safe_fetcher_spec.rb[1:2]       | passed | 0.00047 seconds |
+./spec/services/media/safe_fetcher_spec.rb[1:3]       | passed | 0.02918 seconds |
+./spec/services/profiles/context_spec.rb[1:1:1]       | passed | 0.02427 seconds |

@@ -1,0 +1,11 @@
+default:
+  outfit_explanation: 0.3
+  receipt_structuring: 0.3
+  search_rank: 0.1
+  garment_extraction: 0.5
+  receipt_extraction: 0.5
+  selfie_description: 0.5
+  garment_image: 2.0
+  avatar_portrait: 2.0
+  outfit_preview_subject: 4.0
+  outfit_preview_gemini: 4.0

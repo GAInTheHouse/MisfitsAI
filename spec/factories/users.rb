@@ -1,0 +1,62 @@
+# frozen_string_literal: true
+
+FactoryBot.define do
+  factory :user do
+    sequence(:email) { |n| "user#{n}@example.com" }
+    password { "password123" }
+    password_confirmation { "password123" }
+    time_zone { "America/New_York" }
+
+    trait :new_user do
+      onboarding_completed_at { nil }
+      onboarding_step { 0 }
+    end
+
+    trait :onboarded do
+      onboarding_completed_at { Time.current }
+      onboarding_step { 4 }
+    end
+
+    trait :with_profile do
+      after(:create) do |user|
+        user.profile.update!(gender: "female", color_tone: "warm", favorite_colors: %w[navy])
+      end
+    end
+
+    trait :with_measurements do
+      after(:create) do |user|
+        create(:body_measurement, user: user, height_cm: 170, weight_kg: 65)
+      end
+    end
+
+    trait :with_colors do
+      after(:create) do |user|
+        user.profile.update!(favorite_colors: %w[blue], avoided_colors: %w[orange])
+      end
+    end
+  end
+
+  factory :user_profile do
+    user
+  end
+
+  factory :body_measurement do
+    user
+    height_cm { 175.0 }
+    weight_kg { 70.0 }
+  end
+
+  factory :ai_call do
+    kind { "outfit_explanation" }
+    status { "ok" }
+    est_cost_cents { 10 }
+  end
+
+  factory :garment do
+    user
+    sequence(:name) { |n| "Garment #{n}" }
+    category { "top" }
+    source { "manual" }
+    image_status { "ready" }
+  end
+end

@@ -1,0 +1,48 @@
+{
+  "simplecov_history": {
+    "format_version": 1,
+    "entries": [
+      {
+        "created_at": "2026-10-19T22:46:57Z",
+        "branch": "gxa/phase-A",
+        "commit": "86c924383b711f1f6615cebe6065b3e1832546ff",
+        "totals": {
+          "line": 85.46
+        },
+        "groups": {},
+        "files": {
+          "app/services/ai/call_logger.rb": {
+            "line": 100.0
+          },
+          "app/services/ai/client.rb": {
+            "line": 70.37
+          },
+          "app/services/ai/client/fake.rb": {
+            "line": 79.36
+          },
+          "app/services/ai/client/vertex.rb": {
+            "line": 88.48
+          },
+          "app/services/ai/google_token.rb": {
+            "line": 83.33
+          },
+          "app/services/ai/image.rb": {
+            "line": 100.0
+          },
+          "app/services/ai/kinds.rb": {
+            "line": 100.0
+          },
+          "app/services/media/image_normalizer.rb": {
+            "line": 100.0
+          },
+          "app/services/media/safe_fetcher.rb": {
+            "line": 92.3
+          },
+          "app/services/profiles.rb": {
+            "line": 100.0
+          }
+        }
+      }
+    ]
+  }
+}
