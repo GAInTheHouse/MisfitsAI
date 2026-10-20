@@ -1,13 +1,13 @@
-# Phase 1 (Dev 1)
-/app/controllers/application_controller.rb /app/controllers/users/ /app/controllers/home_controller.rb   @dev-1
-/app/controllers/pages_controller.rb /app/controllers/time_zones_controller.rb /app/controllers/admin/ai_usage_controller.rb   @dev-1
-/app/models/user.rb /app/models/user_profile.rb /app/models/body_measurement.rb /app/models/ai_call.rb   @dev-1
-/app/services/ai/ /app/services/media/ /app/services/profiles/ /app/models/feature.rb   @dev-1
-/app/views/layouts/ /app/views/shared/ /app/views/devise/   @dev-1
-/app/javascript/controllers/shared/ /app/assets/tailwind/   @dev-1
-/config/ /db/migrate/ /Procfile /Gemfile /.github/ /bin/ai_smoke   @dev-1
-/features/support/ /features/step_definitions/common_steps.rb /features/auth/ /features/security/   @dev-1
-/spec/fixtures/ai/ /spec/requests/authorization_spec.rb   @dev-1
+# Phase 1 (@GAInTheHouse)
+/app/controllers/application_controller.rb /app/controllers/users/ /app/controllers/home_controller.rb   @GAInTheHouse
+/app/controllers/pages_controller.rb /app/controllers/time_zones_controller.rb /app/controllers/admin/ai_usage_controller.rb   @GAInTheHouse
+/app/models/user.rb /app/models/user_profile.rb /app/models/body_measurement.rb /app/models/ai_call.rb   @GAInTheHouse
+/app/services/ai/ /app/services/media/ /app/services/profiles/ /app/models/feature.rb   @GAInTheHouse
+/app/views/layouts/ /app/views/shared/ /app/views/devise/   @GAInTheHouse
+/app/javascript/controllers/shared/ /app/assets/tailwind/   @GAInTheHouse
+/config/ /db/migrate/ /Procfile /Gemfile /.github/ /bin/ai_smoke   @GAInTheHouse
+/features/support/ /features/step_definitions/common_steps.rb /features/auth/ /features/security/   @GAInTheHouse
+/spec/fixtures/ai/ /spec/requests/authorization_spec.rb   @GAInTheHouse
 
 # Phase 2 (Dev 2)
 /app/controllers/garments_controller.rb /app/controllers/wardrobe/   @dev-2
