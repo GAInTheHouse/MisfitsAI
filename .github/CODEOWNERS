@@ -1,0 +1,32 @@
+# Phase 1 (@GAInTheHouse)
+/app/controllers/application_controller.rb /app/controllers/users/ /app/controllers/home_controller.rb   @GAInTheHouse
+/app/controllers/pages_controller.rb /app/controllers/time_zones_controller.rb /app/controllers/admin/ai_usage_controller.rb   @GAInTheHouse
+/app/models/user.rb /app/models/user_profile.rb /app/models/body_measurement.rb /app/models/ai_call.rb   @GAInTheHouse
+/app/services/ai/ /app/services/media/ /app/services/profiles/ /app/models/feature.rb   @GAInTheHouse
+/app/views/layouts/ /app/views/shared/ /app/views/devise/   @GAInTheHouse
+/app/javascript/controllers/shared/ /app/assets/tailwind/   @GAInTheHouse
+/config/ /db/migrate/ /Procfile /Gemfile /.github/ /bin/ai_smoke   @GAInTheHouse
+/features/support/ /features/step_definitions/common_steps.rb /features/auth/ /features/security/   @GAInTheHouse
+/spec/fixtures/ai/ /spec/requests/authorization_spec.rb   @GAInTheHouse
+
+# Phase 2 (Dev 2)
+/app/controllers/garments_controller.rb /app/controllers/wardrobe/   @dev-2
+/app/models/garment.rb /app/models/intake_batch.rb /app/models/garment_draft.rb   @dev-2
+/app/services/wardrobe/ /app/services/receipts/ /app/jobs/wardrobe/ /app/jobs/receipts/   @dev-2
+/app/views/garments/ /app/views/wardrobe/ /app/javascript/controllers/wardrobe/ /app/assets/images/placeholders/   @dev-2
+/features/wardrobe/ /features/receipts/ /spec/fixtures/serpapi/   @dev-2
+
+# Phase 3 (Dev 3)
+/app/controllers/week_plans_controller.rb /app/controllers/week_events_controller.rb   @dev-3
+/app/controllers/calendar_syncs_controller.rb /app/controllers/outfits_controller.rb /app/controllers/weather_controller.rb   @dev-3
+/app/models/week_plan.rb /app/models/week_event.rb /app/models/outfit_recommendation.rb   @dev-3
+/app/services/planner/ /app/jobs/planner/ /app/views/week_plans/ /app/views/outfits/ /app/javascript/controllers/planner/   @dev-3
+/features/planner/   @dev-3
+
+# Phase 4 (Dev 4)
+/app/controllers/onboarding/ /app/controllers/profiles_controller.rb /app/controllers/measurements_controller.rb   @dev-4
+/app/controllers/avatars_controller.rb /app/controllers/outfit_previews_controller.rb   @dev-4
+/app/controllers/api/ /app/controllers/admin/metrics_controller.rb   @dev-4
+/app/models/waitlist_entry.rb /app/services/avatars/ /app/services/analytics/ /app/services/navigation/ /app/jobs/avatars/   @dev-4
+/app/views/onboarding/ /app/views/profiles/ /app/views/avatars/ /app/views/outfit_previews/ /app/views/shared/_stepper.html.erb   @dev-4
+/features/onboarding/ /features/profile/ /features/navigation/ /features/avatar/ /features/metrics/   @dev-4

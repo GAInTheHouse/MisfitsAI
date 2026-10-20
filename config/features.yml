@@ -1,0 +1,17 @@
+default: &default
+  onboarding: false
+  profile: false
+  avatar: false
+  outfit_preview: false
+  photo_intake: true
+  receipts: true
+  calendar_sync: true
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default

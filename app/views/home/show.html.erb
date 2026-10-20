@@ -1,0 +1,17 @@
+<div class="max-w-md mx-auto space-y-6">
+  <div class="text-center space-y-2">
+    <h1 class="font-display text-3xl">Welcome</h1>
+    <p class="text-[var(--muted)]">Plan your week in what you already own.</p>
+  </div>
+
+  <div class="rounded-[var(--radius-lg)] border p-6 space-y-4" style="background: var(--panel-strong); border-color: var(--line);">
+    <%= link_to "Sign in", new_user_session_path, class: "btn-primary w-full block text-center" %>
+    <%= link_to "Create account", new_user_registration_path, class: "btn-ghost w-full block text-center" %>
+    <div class="text-center text-xs text-[var(--muted)]">or continue with</div>
+    <%= button_to "Continue with Google", user_google_oauth2_omniauth_authorize_path, method: :post, data: { turbo: false }, class: "btn-ghost w-full" %>
+  </div>
+
+  <p class="text-center text-xs text-[var(--muted)]">
+    <%= link_to "Privacy", privacy_path, class: "underline" %> · <%= link_to "Terms", terms_path, class: "underline" %>
+  </p>
+</div>

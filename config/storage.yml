@@ -1,0 +1,13 @@
+test:
+  service: Disk
+  root: <%= Rails.root.join("tmp/storage") %>
+
+local:
+  service: Disk
+  root: <%= Rails.root.join("storage") %>
+
+google:
+  service: GCS
+  project: <%= ENV["GOOGLE_CLOUD_PROJECT"] %>
+  bucket: <%= ENV["GCS_BUCKET"] %>
+  credentials: <%= ENV.fetch("GOOGLE_SERVICE_ACCOUNT_JSON", "{}") %>

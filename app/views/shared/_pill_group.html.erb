@@ -1,0 +1,10 @@
+<%# locals: name:, options:, selected: nil, multiple: false %>
+<div class="flex flex-wrap gap-2" data-controller="shared--pill-group">
+  <% options.each do |value, label| %>
+    <label class="pill cursor-pointer">
+      <input type="<%= multiple ? 'checkbox' : 'radio' %>" name="<%= name %>" value="<%= value %>" class="sr-only"
+        <%= "checked" if selected.to_s == value.to_s %> />
+      <span><%= label %></span>
+    </label>
+  <% end %>
+</div>

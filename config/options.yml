@@ -1,0 +1,169 @@
+event_types:
+  - key: work_meeting
+    label: Work meeting
+  - key: date_night
+    label: Date night
+  - key: gym
+    label: Gym
+  - key: casual
+    label: Casual
+  - key: none
+    label: No major event
+
+garment_categories:
+  - key: top
+    label: Tops
+  - key: bottom
+    label: Bottoms
+  - key: dress
+    label: Dresses
+  - key: outerwear
+    label: Outerwear
+  - key: shoes
+    label: Shoes
+  - key: accessory
+    label: Accessories
+
+formality:
+  - key: casual
+    label: Casual
+  - key: smart_casual
+    label: Smart casual
+  - key: business
+    label: Business
+  - key: formal
+    label: Formal
+
+seasonality:
+  - key: all_season
+    label: All season
+  - key: hot
+    label: Hot
+  - key: mild
+    label: Mild
+  - key: cold
+    label: Cold
+
+garment_gender:
+  - key: men
+    label: Men
+  - key: women
+    label: Women
+  - key: unisex
+    label: Unisex
+
+aesthetics:
+  - { key: casual, label: Casual, description: Relaxed everyday looks }
+  - { key: streetwear, label: Streetwear, description: Bold and urban }
+  - { key: business_casual, label: Business Casual, description: Sharp but approachable }
+  - { key: maximalist, label: Maximalist, description: More is more }
+  - { key: minimalist, label: Minimalist, description: Clean and refined }
+  - { key: sporty, label: Sporty, description: Active and athletic }
+
+style_color_tones:
+  - { key: neutrals, label: Neutrals, description: "Black, white, gray, beige" }
+  - { key: warm, label: Warm Tones, description: "Brown, camel, red, orange" }
+  - { key: cool, label: Cool Tones, description: "Blue, green, teal, purple" }
+  - { key: bold, label: Bold Colors, description: Saturated, vivid hues }
+  - { key: all, label: All Colors, description: A bit of everything }
+
+featured_brands:
+  - Nike
+  - Adidas
+  - Zara
+  - H&M
+  - Gap
+  - Levi's
+  - Ralph Lauren
+  - Calvin Klein
+  - Tommy Hilfiger
+  - Lululemon
+  - Uniqlo
+  - J.Crew
+  - Madewell
+  - Free People
+  - Urban Outfitters
+  - Everlane
+  - Patagonia
+  - The North Face
+  - New Balance
+  - Vans
+
+search_colors:
+  - Beige
+  - Black
+  - Blue
+  - Brown
+  - Burgundy
+  - Camel
+  - Charcoal
+  - Coral
+  - Cream
+  - Gold
+  - Gray
+  - Green
+  - Grey
+  - Ivory
+  - Khaki
+  - Lavender
+  - Mint
+  - Multicolor
+  - Navy
+  - Olive
+  - Orange
+  - Pink
+  - Purple
+  - Red
+  - Silver
+  - Tan
+  - Taupe
+  - Teal
+  - White
+  - Yellow
+
+profile_skin_tones:
+  - { key: very_light, label: Very Light, hex: "#FDDBB4" }
+  - { key: light, label: Light, hex: "#F5C5A3" }
+  - { key: medium_light, label: Medium Light, hex: "#D4956A" }
+  - { key: medium, label: Medium, hex: "#B46A3C" }
+  - { key: medium_dark, label: Medium Dark, hex: "#8D4A24" }
+  - { key: dark, label: Dark, hex: "#4A2515" }
+
+profile_colors:
+  - { key: black, hex: "#111111" }
+  - { key: white, hex: "#F5F5F0" }
+  - { key: grey, hex: "#9E9E9E" }
+  - { key: navy, hex: "#1A2E5C" }
+  - { key: blue, hex: "#2979FF" }
+  - { key: green, hex: "#2E7D32" }
+  - { key: olive, hex: "#6D6E32" }
+  - { key: brown, hex: "#795548" }
+  - { key: beige, hex: "#D4B896" }
+  - { key: red, hex: "#C62828" }
+  - { key: pink, hex: "#E91E8C" }
+  - { key: yellow, hex: "#F9A825" }
+
+profile_sizes:
+  - XS
+  - S
+  - M
+  - L
+  - XL
+  - XXL
+
+genders:
+  - { key: female, label: Female }
+  - { key: male, label: Male }
+  - { key: other, label: Other }
+
+photo_scanning_messages:
+  - Scanning your photo…
+  - Finding each garment…
+  - Reading colors and fabrics…
+  - Creating clean product shots…
+  - Almost there…
+
+starter_catalog:
+  - { id: cat-white-tee, name: White T-shirt, category: top, color: white, formality: casual, sub_category: t_shirt }
+  - { id: cat-blue-jeans, name: Blue Jeans, category: bottom, color: blue, formality: casual, sub_category: jeans }
+  - { id: cat-white-sneakers, name: White Sneakers, category: shoes, color: white, formality: casual, sub_category: sneakers }

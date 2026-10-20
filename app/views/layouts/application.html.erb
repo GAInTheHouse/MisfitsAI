@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>misfitAI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= yield :analytics %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
+  </head>
+  <body class="min-h-screen" <%= 'data-controller="shared--timezone"'.html_safe if user_signed_in? %>>
+    <div class="atmosphere" aria-hidden="true">
+      <span class="w-64 h-64 -top-10 -left-10"></span>
+      <span class="w-72 h-72 top-1/3 right-0"></span>
+      <span class="w-56 h-56 bottom-0 left-1/3"></span>
+    </div>
+
+    <div class="relative z-10 min-h-screen flex flex-col">
+      <% if user_signed_in? %>
+        <header class="border-b px-4 py-3" style="border-color: var(--line); background: var(--panel-strong);">
+          <div class="mx-auto max-w-5xl flex items-center justify-between gap-4">
+            <%= link_to root_path, class: "font-display text-xl tracking-tight" do %>
+              misfit<span class="font-normal">AI</span>
+            <% end %>
+            <nav class="hidden md:flex items-center gap-4 text-sm">
+              <%= link_to "Wardrobe", wardrobe_path, class: nav_link_class(:wardrobe) %>
+              <%= link_to "Calendar", week_plan_path, class: nav_link_class(:calendar) %>
+              <%= link_to "Outfits", outfits_path, class: nav_link_class(:outfits) %>
+              <%= link_to "Profile", profile_path, class: nav_link_class(:profile) %>
+            </nav>
+            <div class="flex items-center gap-3 text-sm">
+              <span class="hidden sm:inline text-[var(--muted)]"><%= current_user.name || current_user.email %><%= " · #{current_user.gender_label}" if current_user.gender_label.present? %></span>
+              <%= button_to "Sign out", destroy_user_session_path, method: :delete, class: "btn-ghost py-1.5 px-3 text-xs" %>
+            </div>
+          </div>
+        </header>
+        <%= render "shared/stepper" %>
+      <% else %>
+        <header class="px-4 py-6 text-center">
+          <p class="font-display text-3xl">misfitAI</p>
+        </header>
+      <% end %>
+
+      <main class="flex-1 mx-auto w-full max-w-5xl px-4 py-6">
+        <div id="flash"><%= render "shared/flash" %></div>
+        <%= yield %>
+      </main>
+
+      <% if user_signed_in? %>
+        <nav class="md:hidden fixed bottom-0 inset-x-0 border-t px-2 py-2 flex justify-around text-xs" style="border-color: var(--line); background: var(--panel-strong);">
+          <%= link_to "Wardrobe", wardrobe_path, class: mobile_tab_class(:wardrobe) %>
+          <%= link_to "Calendar", week_plan_path, class: mobile_tab_class(:calendar) %>
+          <%= link_to "Outfits", outfits_path, class: mobile_tab_class(:outfits) %>
+          <%= link_to "Profile", profile_path, class: mobile_tab_class(:profile) %>
+        </nav>
+        <div class="h-14 md:hidden"></div>
+      <% end %>
+    </div>
+  </body>
+</html>
