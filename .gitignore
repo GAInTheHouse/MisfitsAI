@@ -39,3 +39,6 @@
 
 /app/assets/builds/*
 !/app/assets/builds/.keep
+
+# RSpec example status persistence (per-machine run state).
+/spec/examples.txt
