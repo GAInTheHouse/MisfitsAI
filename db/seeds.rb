@@ -1,12 +1,16 @@
 # frozen_string_literal: true
 
-demo_email = "demo@misfit.ai"
-user = User.find_or_initialize_by(email: demo_email)
-user.password = ENV.fetch("DEMO_PASSWORD", "changeme")
-user.password_confirmation = user.password
-user.name = "Demo User"
-user.onboarding_completed_at = Time.current
-user.onboarding_step = 4
-user.save!
+require Rails.root.join("db/seeds/demo_user").to_s
+require Rails.root.join("db/seeds/demo_wardrobe").to_s
 
-puts "Demo user: #{demo_email} / #{user.password}"
+user = DemoUser.seed
+if user.nil?
+  puts "Demo user skipped: set DEMO_PASSWORD to create #{DemoUser::EMAIL} in production"
+  return
+end
+
+puts "Demo user: #{user.email} (password from DEMO_PASSWORD)"
+
+# --- Phase 2: demo wardrobe (design doc 9.4) ---
+garments = DemoWardrobe.seed(user)
+puts "Demo wardrobe: #{garments.size} garments (#{user.garments.count} in total)"

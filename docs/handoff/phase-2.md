@@ -1,293 +1,567 @@
-# Phase 2 handoff (Dev 2) — IN PROGRESS
+# Phase 2 handoff (Dev 2, 2026-10-21)
 
-> Draft kept up to date during Phase 2. It becomes the final handoff note (design doc 10.4) at the exit gate.
+> **Status: implementation complete and verified locally. The exit gate is NOT passed.** Items 1, 3, 4, 5 and 8 of the 10.4 gate need the PR, the Heroku deploy and real credentials (see "Exit gate"). Nothing in this note has been run against real Google Cloud or SerpAPI. "Verified" means verified locally with the fake AI adapter and stubbed HTTP, unless it says otherwise.
 
-## Progress
+## Contents
 
-All Phase 2 work is committed directly on `phase-2`, one or more logical commits per step, and goes to `main` as a single PR at the end (same approach as Phase 1).
+1. Progress
+2. Shipped (implemented functionality)
+3. Architecture and service contracts
+4. Not done / deferred
+5. Deviations from the design doc
+6. Decisions made where the doc was silent
+7. Changes to Phase 1 infrastructure (Phase 1 issues found and fixed)
+8. Known issues: remaining Phase 1 issues for Dev 1
+9. Security and reliability decisions
+10. Schema changes after Phase 1
+11. Config vars and flags
+12. Deployment instructions
+13. Known limitations and residual risks
+14. Integration tests that need real credentials
+15. How to verify
+16. Local verification results
+17. Exit gate (10.4)
+18. AI spend
+19. bin/ai_smoke output
+20. Questions for the next phase
 
-| Step | Status |
+## 1. Progress
+
+All Phase 2 work is committed directly on `phase-2`, one or more logical commits per step. It goes to `main` as a single PR at the end, the same approach as Phase 1. The PR is not open yet.
+
+| Step | Commit | Status |
+|---|---|---|
+| 1. Acceptance specs (and CI maintenance) | `797e03a`, `55ce9ae` | Done |
+| 2. Test infrastructure and prerequisites | `d9cf933` | Done |
+| 3. Model layer | `5d1912f` | Done |
+| 4. Wardrobe UI and manual garment management | `3ec529d` | Done |
+| 5. AI image generation and bulk garment creation | `edaa1ce` | Done |
+| 6. Garment image search and remote image import | `290f349` | Done |
+| 7. AI photo intake | `661d975` | Done |
+| 8. Receipt parsing and intake | `9ff2aa0` | Done |
+| 9. Security, authorization and reliability review | `a7438c0` | Done |
+| 10. Demo data, final verification and handoff | the commit that adds this note | Done (exit gate still open, section 17) |
+
+## 2. Shipped (implemented functionality)
+
+Each feature lists the scenarios that cover it. No Phase 2 scenario is `@wip`.
+
+| Feature | Scenarios |
 |---|---|
-| 1. Acceptance specs | Done (approved; fast-forwarded from `p2/acceptance-specs`) |
-| 2. Test infrastructure and prerequisites | Done (approved) |
-| 3. Model layer | Done (approved) |
-| 4. Wardrobe UI and manual garment management | Done (approved) |
-| 5. AI image generation and bulk garment creation | Done (approved) |
-| 6. Garment image search and remote image import | Done (approved) |
-| 7. AI photo intake | Done (approved) |
-| 8. Receipt parsing and intake | Done (approved) |
-| 9. Security, authorization and reliability review | In review |
+| Wardrobe page (`GET /wardrobe`): count, planning hint, "Next: plan your week", add panel (Photo AI / Describe item (Manual, Search) / Receipt), category filter in a Turbo Frame, cards, empty states | `features/wardrobe/manage.feature` (12 scenarios, 2 `@javascript`) |
+| Manual add (`POST /garments`), with an optional AI product image | `features/wardrobe/manual_add.feature` (11, 2 `@javascript`) |
+| Hide / show (`Wardrobe::SetHidden`) and delete | `manage.feature` |
+| Image generation (`Wardrobe::GenerateGarmentImageJob`), the kill switch, the blocked fallback, retry after failure | `manual_add.feature` |
+| Garment image search (SerpAPI) and remote image import (`Media::SafeFetcher`) | `features/wardrobe/search.feature` (10, 1 `@javascript`) |
+| AI photo intake: upload, scanning, draft review, edits, commit, discard, purge | `features/wardrobe/photo_intake.feature` (12, 2 `@javascript`) |
+| Receipts: pasted text, PDF, text file, receipt image (vision), review, commit | `features/receipts/receipts.feature` (10, 1 `@javascript`) |
+| Feature flags hide the Photo AI and Receipt tabs | `manage.feature` |
+| Demo wardrobe seed (15 garments with images, idempotent, never touches the user's own garments) | `spec/seeds/demo_seeds_spec.rb` |
+| Demo account seed hardening (Phase 1 fix) | `spec/seeds/demo_user_spec.rb` |
 
-## Shipped
+Details by step:
 
-- Acceptance specs (all `@wip`, excluded from CI by `config/cucumber.yml`):
-  - `features/wardrobe/manual_add.feature`, `manage.feature`, `search.feature`, `photo_intake.feature`
-  - `features/receipts/receipts.feature`
-  - Pending step definitions: `features/step_definitions/{wardrobe,search,photo_intake,receipt}_steps.rb`
-- Test harness (Step 2):
-  - `features/harness/test_harness.feature` (not `@wip`, runs in CI) with `harness_steps.rb` and `features/support/harness_jobs.rb`.
-  - `spec/infrastructure/test_harness_spec.rb`: Phase 2 factory lint, Action Cable test adapter, Phase 2 option lists.
-  - Implemented steps: "my wardrobe contains:" (8.3 canonical table), "AI image generation is disabled", "the AI blocks images for {string}", "the {string} feature is disabled".
-  - Factories: `spec/factories/garments.rb` (`:garment` with category, `:hidden`, `:pending_image`, `:with_image` traits; `:intake_batch`; `:garment_draft`).
-  - Upload fixtures in `spec/fixtures/files/`: `garment.jpg`, `outfit.jpg`, `blank.jpg`, `receipt.jpg`, `receipt.pdf` (hand-built, text extractable by pdf-reader), `not_an_image.txt`. Oversized uploads are generated at run time, not committed.
+- **Acceptance specs (Step 1):** the five feature files above, written first as `@wip`, and their step definitions in `features/step_definitions/{wardrobe,search,photo_intake,receipt}_steps.rb`.
+- **Test harness (Step 2):**
+  - `features/harness/test_harness.feature` with `harness_steps.rb` and `features/support/harness_jobs.rb`.
+  - `spec/infrastructure/test_harness_spec.rb`.
+  - Implemented the steps "my wardrobe contains:" (the 8.3 canonical table), "AI image generation is disabled", "the AI blocks images for {string}" and "the {string} feature is disabled".
+  - Factories in `spec/factories/garments.rb`: `:garment` (traits `:hidden`, `:pending_image`, `:with_image`), `:intake_batch`, `:garment_draft`.
+  - Upload fixtures in `spec/fixtures/files/`. Oversized uploads are generated at run time.
+- **Model layer (Step 3):**
+  - `Garment`:
+    - `thumb` (256 fill) and `card` (512 limit) variants;
+    - `Garment.normalize_kind`;
+    - normalization of the name, sub-category, colours and blank fields;
+    - an 80-character name limit;
+    - `price_cents` and `times_recommended` must be non-negative;
+    - `#placeholder_asset`, `Garment.outfit_ready?` and `Garment.with_image_variants`.
+  - `GarmentDraft`: status, the `attrs` hash, ownership checks, the scopes `ordered`, `committable` and `stale`, and the predicates.
+  - `IntakeBatch`: kind, status, progress and parser-strategy validations; the 600-character `extracted_text_preview`; the scopes `photos`, `receipts` and `stale`; and the methods `mark_processing!`, `mark_ready!` and `mark_failed!`.
+  - Placeholder images in `app/assets/images/placeholders/*.jpg`.
+- **Wardrobe UI (Step 4):** `GarmentsController` and its partials:
+  - `garments/_garment`;
+  - `garments/_thumb`, the contract partial for Phase 3, with `dom_id(garment, :thumb)`;
+  - `_status`, `_add_panel`, `_form`, `_inventory` and `_empty`.
+- **AI images and bulk add (Step 5):**
+  - `Wardrobe::Prompts.garment_image` (exactly the 6.4 prompt);
+  - `Wardrobe::GenerateGarmentImageJob`;
+  - `POST /garments/:id/retry_image`;
+  - `Wardrobe::AddGarments` and `Wardrobe::StarterImport`.
+- **Search and import (Step 6):**
+  - `Wardrobe::Search::{ImageSearch, FilterAndRank, WordLists, AddResult, Error}`;
+  - `Wardrobe::SearchesController` (`new`, `create`, `select`);
+  - `Wardrobe::ImportRemoteImageJob`.
+- **Photo intake (Step 7):**
+  - Controllers: `Wardrobe::PhotoIntakesController`, `IntakeBatchesController` (`commit` and `destroy`) and `DraftsController#update`.
+  - Photo-intake services: `Wardrobe::PhotoIntake::{Prompts, Mapper, ImagePreparer, Commit}`.
+  - Jobs: `Wardrobe::ExtractGarmentsJob`, `GenerateDraftImageJob` and `PurgeStaleDraftsJob` (daily at 4am, `config/recurring.yml`).
+- **Receipts (Step 8):**
+  - `Wardrobe::ReceiptsController`.
+  - Receipt services: `Receipts::{TextParser, PdfText, VisionParser, Prompts, Intake, Commit}`.
+  - `Receipts::ParseImageJob`.
+  - Shared with photo intake: `Wardrobe::DraftEdits` and `IntakeBatchJobSupport`.
+- **Security review (Step 9):** see section 9. The regression specs are in `spec/requests/phase2_security_spec.rb`, `spec/requests/rate_limits_spec.rb` and `spec/channels/cable_authorization_spec.rb`.
+- **Demo data (Step 10):**
+  - `db/seeds.rb` now calls `DemoWardrobe.seed(user)` (`db/seeds/demo_wardrobe.rb`), which seeds the 15 garments listed in `db/seeds/demo_wardrobe_items.rb`.
+  - The images are `db/seeds/images/*.jpg` (512x512 JPEG, about 140 KB in all), generated by `script/generate_seed_images.rb`.
+  - The silhouette drawing is shared with the placeholder script through `script/lib/garment_silhouettes.rb`. The six placeholder JPEGs it produces are byte-identical to the Step 3 versions.
 
-- Model layer (Step 3):
-  - `Garment`: `thumb` (`resize_to_fill [256,256]`) and `card` (`resize_to_limit [512,512]`) image variants; `Garment.normalize_kind` (6.8.2 / 12.3); `normalizes` for name (squish), sub_category (snake_case), colors (lowercase) and blank optional fields (nil); name limited to 80 characters (6.4); `price_cents` and `times_recommended` must be non-negative integers; `#placeholder_asset`.
-  - `GarmentDraft`: `status` defaults to `pending`; validations for status, `attrs` being a hash, and the draft's user owning its batch; scopes `ordered`, `committable`, `stale`; status predicates; `#name`, `#category`, `#garment_attributes`, `#confidence`, `#needs_confirmation?`, `#committable?`.
-  - `IntakeBatch`: `status` defaults to `pending`; validations for kind, status, progress (0-100) and parser_strategy; `extracted_text_preview` keeps the first 600 characters plus "..." (6.12); scopes `photos`, `receipts`, `stale`; kind and status predicates, `#finished?`; `#mark_processing!`, `#mark_ready!`, `#mark_failed!`.
-  - Placeholder images `app/assets/images/placeholders/{top,bottom,dress,outerwear,shoes,accessory}.jpg` (512x512 JPEG), generated by `script/generate_placeholder_images.rb`.
-  - Specs: `spec/models/{garment,garment_draft,intake_batch}_spec.rb`.
+### The demo wardrobe
 
-- Wardrobe UI (Step 4):
-  - `GET /wardrobe` (`GarmentsController#show`): header with item count, planning hint, "Next: plan your week" link (`Garment.outfit_ready?`), add panel with Photo AI / Describe item (Manual, Search) / Receipt tabs (Photo AI and Receipt follow their feature flags), category filter pills in a `wardrobe_inventory` Turbo Frame (`?category=`, URL updated), garment cards, empty states. Subscribes to `[current_user, :wardrobe]`.
-  - Manual add (`POST /garments`): name, category, color (datalist of search colors), brand (datalist of search brands), formality (default casual), season (default all_season), size, fit notes. Saved with `source: manual`, `image_status: placeholder`. Turbo Stream response prepends the card and refreshes header, form and flash; plain HTML redirects (or re-renders with 422 on errors).
-  - Hide / show (`PATCH /garments/:id/hide`, `hidden=true|false`, missing value hides) through `Wardrobe::SetHidden`, which broadcasts the card to the wardrobe stream.
-  - Delete (`DELETE /garments/:id`) with `data-turbo-confirm`; purges the image; outfit recommendations keep their row with the slot cleared (foreign key `on_delete: :nullify`).
-  - Partials: `garments/_garment` (card), `garments/_thumb` (contract, `dom_id(garment, :thumb)`), `_status`, `_add_panel`, `_form`, `_inventory`, `_empty`; `GarmentsHelper`.
-  - `Garment.outfit_ready?` and `Garment.with_image_variants` (preload, no N+1 on the grid).
-  - Specs: `spec/requests/garments_spec.rb`, `spec/services/wardrobe/set_hidden_spec.rb`, `spec/views/garments/_thumb.html.erb_spec.rb`, `spec/support/turbo_streams.rb`.
-  - Activated scenarios: 4 in `manual_add.feature`, all 9 in `manage.feature`, the two feature-flag tab scenarios; added "The add panel offers every way to add garments" and two `@javascript` scenarios (Turbo Stream create; in-place hide and frame filtering).
+| Category | Garments |
+|---|---|
+| Top | White Oxford Shirt, Light Blue Button-down, Navy Crewneck Sweater, Grey Performance Tee |
+| Bottom | Charcoal Dress Pants, Dark Wash Jeans, Khaki Chinos, Black Running Shorts |
+| Dress | Black Midi Dress |
+| Outerwear | Camel Wool Coat, Denim Jacket |
+| Shoes | White Leather Sneakers, Brown Leather Loafers, Black Running Shoes |
+| Accessory | Black Leather Belt |
 
-- AI image generation and bulk creation (Step 5):
-  - `Wardrobe::Prompts.garment_image` (exact 6.4 prompt; optional clauses only when set).
-  - `Wardrobe::GenerateGarmentImageJob` (`ai_images` queue): Imagen through `Ai::Client`, normalized to a `GARMENT_ASSET_SIZE` (512) square JPEG, `image_status: ready`, broadcasts `garments/_garment` and `garments/_thumb` to `[user, :wardrobe]`. Disabled / quota / blocked -> `placeholder`, no retry. `Ai::TransientError` -> 3 attempts, then `failed`. Deleted garment -> discarded. Anything else -> `failed` and re-raised. Skips garments that already have a ready image.
-  - Manual add's "Generate a product image" checkbox queues the job; the garment stays `placeholder` until the image is attached (6.4).
-  - `POST /garments/:id/retry_image`: a `failed` garment goes back to `pending` and is queued again; failed cards show "Image unavailable" and a "Retry image" button.
-  - `Wardrobe::AddGarments.call(user:, items:, source:, generate_images: true)` and `Wardrobe::StarterImport.call(user:, items:)` (4.2 contracts, see Decisions).
-  - Specs: `spec/jobs/wardrobe/generate_garment_image_job_spec.rb`, `spec/services/wardrobe/{prompts,add_garments,starter_import}_spec.rb`, request specs for the checkbox and retry; `spec/support/env_helpers.rb`.
-  - Activated the 4 remaining `manual_add.feature` scenarios; added "The generated image appears without reloading the page" (`@javascript`, proves job broadcasts reach the browser) and "A failed image can be retried".
+The set covers formal, business, smart casual, casual and athletic, and every season, so Phase 3's engine has something to choose from for each occasion.
 
-- Image search and remote import (Step 6):
-  - `Wardrobe::Search::ImageSearch` (SerpAPI `google_images`, 4 s open / 8 s read timeouts, query built in the 6.5 order, page-2 backfill, results cached 24 h by query digest, `data:` and non-http(s) image links dropped), `FilterAndRank` (6.5 algorithm), `WordLists`, `AddResult`, `Wardrobe::Search::Error` (carries the HTTP status).
-  - `Wardrobe::SearchesController`: `new` (form page), `create` (results in the `garment_search_results` frame; errors 422/502/503/504 in the frame), `select` (adds the garment for `current_user`; Turbo Stream or redirect).
-  - Search form in Describe item > Search: brand (datalist of 51 brands), keywords, category pills, kind (grouped by category), color, material, formality, season, gender (Any / Men / Women).
-  - `Wardrobe::ImportRemoteImageJob`: `Media::SafeFetcher` (10 MB, 10 s), content sniffed to JPEG/PNG/WebP, 512 square JPEG, `ready`; any download/format failure -> `placeholder` with the card note "Couldn't download that image; using a placeholder."; one run per garment; never overwrites a ready image.
-  - Specs: `spec/services/media/safe_fetcher_spec.rb` (rewritten, 36 examples), `spec/services/wardrobe/search/{filter_and_rank,image_search,add_result}_spec.rb`, `spec/jobs/wardrobe/import_remote_image_job_spec.rb`, `spec/requests/wardrobe/searches_spec.rb`; fixtures `spec/fixtures/serpapi/*.json`; `features/support/stubs/serpapi.rb`.
-  - Activated all 9 `search.feature` scenarios; added a `@javascript` scenario for the whole flow inside the wardrobe page.
+What a seed run does:
+- Each seeded garment is marked with `source: "starter"` and a `source_url` of `demo-seed:<image file>` (for example `demo-seed:white_oxford_shirt.jpg`). A run looks garments up by that marker only, so running it again updates the same 15 rows and never duplicates them.
+- A garment the user added is never matched, even with the same name as a demo garment, because it lacks the marker. Starter-catalog garments from Phase 4 have no `source_url` either. No column was added: `source_url` is free for seeded rows (they have no web source), and no view links to it.
+- It sets `image_status: "ready"`.
+- It attaches the image only when there is none or its checksum differs, so a second run creates no new blobs.
+- It leaves `times_recommended`, `hidden_from_recommendations` and any garment the user added by hand untouched.
+- It makes no AI calls and queues no jobs.
 
-- Photo intake (Step 7):
-  - `Wardrobe::PhotoIntakesController` (`new`, `create`, `show`; behind `Feature.enabled?(:photo_intake)`), `Wardrobe::IntakeBatchesController` (`commit`, `destroy`), `Wardrobe::DraftsController#update`. All lookups go through `current_user`.
-  - Upload checks: missing, empty, over 15 MB, and image type by content (JPEG/PNG/WebP/HEIC). `Wardrobe::PhotoIntake::ImagePreparer`: pixel count checked from the header (50 MP) before decoding, EXIF orientation, at most 1600 px, sRGB JPEG without alpha.
-  - `Wardrobe::ExtractGarmentsJob` (`ai_text`): exact 6.6 prompt and schema through `Ai::Client#generate_json`, `PhotoIntake::Mapper` (6.6 mapping, cap `VISION_MAX_GARMENT_IMAGES`), drafts, batch `ready`; failures with the 6.6 messages plus a quota and an unreadable-photo message; `Ai::TransientError` retried three times. The source photo is purged once the batch is ready or failed.
-  - `Wardrobe::GenerateDraftImageJob` (`ai_images`): draft product image (exact 6.6 prompt); failures leave the draft committable with the placeholder; progress 30 -> 100; broadcasts only the image area and progress; one run per draft; no AI call or attach for a draft committed meanwhile.
-  - Review UI (in the lazily loaded `photo_intake` frame of the Photo AI tab, or on its own page): scanning card with the 12.3 rotating copy, draft cards (image, "Add this item", name, category, badges, "Please double-check"), progress, Select all / Select none (`wardrobe--draft-selection`, JS only), "Add selected", "Discard" (with confirmation), failed state with "Try again".
-  - `Wardrobe::PhotoIntake::Commit` (see Decisions) and `Wardrobe::PurgeStaleDraftsJob` (daily at 4am, `config/recurring.yml`).
-  - Specs: mapper, prompts (compared to the doc text), image preparer, both jobs, purge job, request spec `spec/requests/wardrobe/photo_intakes_spec.rb`, authorization cases.
-  - Activated all 10 `photo_intake.feature` scenarios and added "Photo intake from the wardrobe's Photo AI tab" (`@javascript`).
+## 3. Architecture and service contracts
 
-- Receipts (Step 8):
-  - `Wardrobe::ReceiptsController` (`new`, `create`, `show`; behind `Feature.enabled?(:receipts)`), in the lazily loaded `receipt_intake` frame of the Receipt tab or on its own page. Input routed by content: pasted text (`text_rules`), a PDF (`pdf_text_rules`) or a UTF-8 text file (`plain_text_rules`) are parsed in the request and never stored as files; a receipt image (`image_vision`) is stored and read by `Receipts::ParseImageJob`.
-  - `Receipts::TextParser` (exact 6.12 port), `Receipts::PdfText` (first 20 pages), `Receipts::VisionParser` (exact 6.12 prompt and schema through `Ai::Client`, 6.12 normalization), `Receipts::Intake` (batch + drafts with the 6.12 attrs), `Receipts::Commit` (edits, price parsing, `Wardrobe::AddGarments` with `source: :receipt`, price note, product images on request).
-  - Review: one editable card per item (Include, name, brand, size, color, category, price), "Please double-check" on low confidence, extracted text (collapsible), "Generate product images" (checked), Select all / Select none, "Add selected", "Discard", failed state with "Try again".
-  - Reused from photo intake: `IntakeBatch`/`GarmentDraft`, `IntakeBatchesController#commit`/`destroy` (now branching on kind), `Wardrobe::DraftEdits` (shared edit step, photo commit refactored onto it), `IntakeBatchJobSupport` (shared failure/purge/broadcast for intake jobs, `ExtractGarmentsJob` refactored onto it), `ImagePreparer` (with `max_side:`), the `wardrobe--draft-selection` Stimulus controller.
-  - Specs: text parser, PDF text, vision parser, commit, image job, request spec `spec/requests/wardrobe/receipts_spec.rb`, authorization cases.
-  - Activated all 8 `receipts.feature` scenarios still `@wip` and added "Add receipt items from the wardrobe's Receipt tab" (`@javascript`). No `@wip` scenarios remain in Phase 2.
+Phase 2 provides these contracts (4.2, 10.1). Each exists with its documented signature and has RSpec coverage.
 
-- Security and reliability review (Step 9): see "Step 9 review" below; regressions in `spec/requests/phase2_security_spec.rb` and `spec/requests/rate_limits_spec.rb`.
+| Contract | Signature | Returns / raises | Spec |
+|---|---|---|---|
+| Starter import (for Phase 4) | `Wardrobe::StarterImport.call(user:, items:)` | `Array<Garment>`; queues `GenerateGarmentImageJob` after commit | `spec/services/wardrobe/starter_import_spec.rb` |
+| Bulk add | `Wardrobe::AddGarments.call(user:, items:, source:, generate_images: true)` | `Array<Garment>`; one transaction; raises `ActiveRecord::RecordInvalid` | `spec/services/wardrobe/add_garments_spec.rb` |
+| Garment hide (Phase 3 calls it) | `Wardrobe::SetHidden.call(user:, garment:, hidden:)` | the garment; broadcasts the card and header to `[user, :wardrobe]` | `spec/services/wardrobe/set_hidden_spec.rb` |
+| Thumbnail partial (Phase 3 renders it) | `render "garments/thumb", garment:, class: "..."` | `<img id=dom_id(garment, :thumb)>`; jobs re-broadcast it | `spec/views/garments/_thumb.html.erb_spec.rb` |
+| Read-only model API | `user.garments.visible`, `Garment.outfit_ready?`, `Garment.with_image_variants` | scopes | `spec/models/garment_spec.rb` |
+| Safe fetch (Phase 1 contract, hardened) | `Media::SafeFetcher.fetch(url, max_bytes:, timeout:)` | `Ai::Image`; raises `Media::UnsafeUrlError` or `Media::FetchError` (`Media::TransientFetchError` is a subclass) | `spec/services/media/safe_fetcher_spec.rb` |
 
-## Not done / deferred
+Internal entry points (not called across domains):
+- `Wardrobe::Search::ImageSearch.call(...)` returns an array of `{ image_url, title, source_url, thumbnail_url }` and raises `Wardrobe::Search::Error`, which carries an HTTP status.
+- `Wardrobe::Search::FilterAndRank` (the 6.5 algorithm).
+- `Wardrobe::PhotoIntake::Commit.call(batch:, edits:)`.
+- `Receipts::TextParser.call(text)`.
+- `Receipts::PdfText.call(io)` raises `Receipts::UnreadableError`.
+- `Receipts::VisionParser`.
+- `Receipts::Intake.from_text` and `Receipts::Intake.finish`.
+- `Receipts::Commit.call(batch:, edits:, generate_images:)`.
 
-- Receipt LLM cleanup (`RECEIPT_LLM_CLEANUP`, 6.12 optional stretch): not built; for Phase 4's stretch list.
+### Jobs and queues
 
-- Photo intake click-to-zoom `<dialog>` (6.6, "may defer" in 11.2): not built; for Phase 4's stretch list.
+| Job | Queue | Concurrency key |
+|---|---|---|
+| `Wardrobe::GenerateGarmentImageJob` | `ai_images` | one run per garment |
+| `Wardrobe::GenerateDraftImageJob` | `ai_images` | one run per draft |
+| `Wardrobe::ExtractGarmentsJob` | `ai_text` | one run per batch |
+| `Receipts::ParseImageJob` | `ai_text` | one run per batch |
+| `Wardrobe::ImportRemoteImageJob` | `default` | one run per garment |
+| `Wardrobe::PurgeStaleDraftsJob` | `default` | recurring, daily at 4am |
 
-- Search re-ranking with the Ranking API (`SEARCH_RERANK_ENABLED`, 6.5 stretch): not built; for Phase 4's stretch list.
+How the pieces connect:
+- Every job declares its handlers in the same order: a catch-all `rescue_from` first, then the specific handlers, then `retry_on`, then `discard_on`.
+- Every live update is a Turbo broadcast to `[user, :wardrobe]`. The image broadcasts are shared through `Wardrobe::GarmentBroadcasts`.
+- Photo intake and receipts share the same tables (`IntakeBatch` and `GarmentDraft`), the same commit and discard routes, the edit step (`Wardrobe::DraftEdits`), the job support (`IntakeBatchJobSupport`), the upload concern (`IntakeUpload`) and the `wardrobe--draft-selection` Stimulus controller.
 
-- Everything after Step 1. See `Progress`.
+## 4. Not done / deferred
 
-## Changes to Phase 1 infrastructure
+- **Photo intake click-to-zoom `<dialog>`** (6.6, listed "may defer" in 11.2): not built. Proposed for Phase 4's stretch list.
+- **Receipt LLM cleanup** (`RECEIPT_LLM_CLEANUP`, an optional stretch in 6.12): not built. Phase 4 stretch list.
+- **Search re-ranking with the Ranking API** (`SEARCH_RERANK_ENABLED`, a 6.5 stretch): not built. Phase 4 stretch list.
+- **Production verification:** nothing has been run against real Vertex, Imagen, SerpAPI, GCS or Heroku. See sections 14 and 17.
 
-- **Brakeman: temporary suppression of the Rails 8.0 pending-EOL warning only.**
-  - File: `config/brakeman.ignore`. One entry (fingerprint `98b26f60…22db42`, check `EOLRails`, Medium, "Support for Rails 8.0.5.1 ends on 2026-11-07").
-  - All other Brakeman checks stay enabled. CI still runs `bin/brakeman --no-pager -q -w2`.
-  - **Rails must be upgraded before 2026-11-07.** On that date Brakeman switches to a High-confidence "ended on" warning with a different warning code and fingerprint, which this entry does not cover. CI will fail again on its own until Rails is upgraded.
-  - Upgrading is out of Phase 2 scope. To file as a `phase-1` issue (owner: Dev 1).
-- **Cucumber always uses the fake AI adapter.** `features/support/ai_fake.rb` sets `AI_ADAPTER=fake` at load time and before every scenario, and fails the scenario if `Ai::Client.current` is not `Ai::Client::Fake`. Before this, a shell or `.env` with `AI_ADAPTER=vertex` sent Cucumber to the real adapter.
-- **ENV sandbox for Cucumber.** `features/support/env_sandbox.rb` restores `ENV` after every scenario.
-- **G4: "When background jobs finish" now drains the queue** (`features/step_definitions/common_steps.rb`). It repeats `perform_enqueued_jobs` until nothing is enqueued, and raises after 20 rounds. Same meaning as before; it now also runs jobs enqueued by other jobs (design doc 8.1).
-- **G3: test Action Cable adapter is `async`** (`config/cable.yml`), so broadcasts reach the Cuprite browser (8.1). RSpec swaps in the test adapter per example (`spec/support/action_cable.rb`), because rspec-rails' `have_broadcasted_to` needs it.
-- **G1: AI fixtures.** `spec/fixtures/ai/garment_extraction.json` and `receipt_extraction.json` now hold `items` shaped like the 6.6 and 6.12 schemas. The `kind` key is kept so `spec/services/ai/client/fake_spec.rb` stays unchanged. The extraction fixture includes mapper edge cases (uppercase color, `pattern: "none"`, null material, a brand). The 1x1 PNG fixtures are unchanged.
-- **G2: `config/options.yml`.** The starter catalog is completed (was 3 of 21 items) and a commented Phase 2 block adds `search_brands`, `search_materials`, `search_kinds_by_category`. `Options` symbolizes keys, so kinds are read as `Options.fetch(:search_kinds_by_category)[:top]`.
-- **G8: CSS.** `app/assets/tailwind/application.css` defines `.pill` (checked and focus states via `:has()`), `.tab` (active state set by `shared--tabs`), `.badge` and `.spinner`, which the shared partials already used.
-- **Garment factory moved** from `spec/factories/users.rb` to `spec/factories/garments.rb` (the Phase 2 path in 10.2). Its default `image_status` changed from `ready` to `placeholder`, since no image is attached; `:with_image` gives a `ready` garment with a real attachment. Existing specs only use the name and owner, so none changed.
-- **Layout favicon links** (`app/views/layouts/application.html.erb`): the Rails 8 default `<link rel="icon">` / `apple-touch-icon` tags for `public/icon.png` and `icon.svg`. Without them Chrome requests `/favicon.ico`, which raises a routing error that Capybara re-raises and fails every passing `@javascript` scenario.
-- **Authorization spec** (`spec/requests/authorization_spec.rb`): Phase 2 cases for `retry_image` and the wardrobe page (8.4: each phase adds its routes).
-- **CSS:** `.input` for form fields.
-- **G5: `Media::SafeFetcher` hardened** (`app/services/media/safe_fetcher.rb`), same public contract. Every hop (first URL and each redirect, via ssrf_filter's `resolver` and `request_proc`) must be http/https on the default port with no credentials and a host outside `BLOCKED_HOSTS`; ssrf_filter still refuses private, loopback, link-local, shared and metadata addresses and connects to the vetted IP (no DNS rebinding). At most 3 redirects. Only a 2xx response counts; the body is streamed under the byte limit (Content-Length and while reading) and an overall deadline. Timeouts and network errors become `Media::FetchError`; error messages never contain the URL. DNS is a replaceable `resolver` (tests use `FakeDns`, so the Phase 1 spec no longer needs real DNS).
-- **Media error classes and `BLOCKED_HOSTS`:** each error class has its own file (`app/services/media/{invalid_image,unsafe_url,fetch}_error.rb`); `BLOCKED_HOSTS` moved to `Media::SafeFetcher::BLOCKED_HOSTS` (nothing referenced `Media::BLOCKED_HOSTS`).
-- **CSP** (`config/initializers/content_security_policy.rb`): `img-src` adds exactly the hosts in `config.x.search_thumbnail_hosts` (`encrypted-tbn0..3.gstatic.com`, `serpapi.com`) for search preview thumbnails. `ImageSearch` renders a thumbnail only from those hosts over https (anything else shows "No preview", no `<img>`), so the CSP and the page use one list. Result images carry `referrerpolicy="no-referrer"`.
-- **Rack::Attack** (`config/initializers/rack_attack.rb`): garment search has its own throttle, `POST /wardrobe/searches` 10 per minute per user (4.4), matched by exact path, so adding a result (`/wardrobe/searches/select`) no longer spends it; adding results has a separate 30-per-minute-per-user throttle. Photo intake, receipts and avatar keep the shared 10-per-minute AI throttle. Specs: `spec/requests/rate_limits_spec.rb`.
-- **`Media::TransientFetchError`** (subclass of `FetchError`, so the contract is unchanged): raised for timeouts, network errors, the overall deadline and HTTP 408/429/5xx; everything else stays a plain `FetchError`.
-- **"When background jobs finish"** (`features/step_definitions/common_steps.rb`) now also reloads the page under rack-test after a GET (8.1: "then reloads the page"), because rack-test receives no Turbo Stream broadcasts. Browser scenarios are unchanged (they wait for the broadcast). It never replays a form post.
-- **AI fixture images** (`spec/fixtures/ai/*.png`): all ten were 1x1 PNGs with a bad zlib checksum (libvips printed `IDAT: incorrect data check`). Regenerated as valid 64x64 PNGs, one colour per kind, as 3.7 describes (8.2 allows refining fixtures).
-- **Test support:** `spec/support/fake_dns.rb` + `features/support/fake_dns.rb` (no real DNS in tests), `spec/support/cache.rb` + `features/support/cache.rb` (empty cache per test), `features/support/browser_network.rb` (browser scenarios may only load the test server).
-- **Fixed on behalf of Phase 1: AI error classes autoload** (`app/services/ai/{error,transient_error,content_blocked_error,quota_exceeded_error,disabled_error}.rb`). They were defined inside `ai/client.rb`, so Zeitwerk could only find them after `Ai::Client` had loaded; a job's class-level `retry_on Ai::TransientError` (the 2.4 pattern) raised `NameError` in development and test (CI hid it by eager loading). Each class now has its own file with an identical definition; `client.rb` no longer declares them. `bin/rails zeitwerk:check` passes. Owner to notify: Dev 1.
-- **Fixed on behalf of Phase 1: flash container** (`app/controllers/application_controller.rb`). `handle_application_error` answered Turbo Stream requests with `turbo_stream.replace("flash", ...)`, but `shared/flash` has no `#flash` wrapper, so the first error removed the container and later messages had nowhere to go. It now uses `turbo_stream.update`. Regression spec: `spec/controllers/application_controller_spec.rb` (fails on the old code). Owner to notify: Dev 1.
-- **`spec/examples.txt` untracked.** It was committed but RSpec rewrites it on every run (per-machine state). Removed from the index with `git rm --cached` (the local file is kept) and added to `.gitignore`.
+## 5. Deviations from the design doc
 
-## Deviations from the design doc
-
+**Process**
 - [DEVIATION] 10.7: Phase 2 is one PR with logical commits on `phase-2`, not one PR per `p2/<topic>` branch. This follows the Phase 1 approach, at the team's request. Step 1 was written on `p2/acceptance-specs` and fast-forwarded into `phase-2`.
-- [DEVIATION] 10.7: Step 1 also carries the two CI-maintenance changes above, so CI stays green for the rest of Phase 2.
+- [DEVIATION] 10.7: Step 1 also carries two CI-maintenance changes (the Brakeman EOL entry and untracking `spec/examples.txt`), so CI stays green for the rest of Phase 2.
 
-- [DEVIATION] 8.4: `spec/services/receipts/text_parser_spec.rb` inputs are written from the 6.12 algorithm, because the original `receipt_parser.py` tests are not available. They pin the documented behaviour, including the original's quirks (below).
-- [DEVIATION] 6.12: the receipt review is a list of editable cards instead of a table, so it works at 390 px; the fields are the ones 6.12 lists.
-- [DEVIATION] 6.4: the six placeholder images are new flat silhouettes (`--line-strong` on `--bg`), drawn with libvips by `script/generate_placeholder_images.rb`, because `misfitai-mobile/assets/stock/` is not available. The doc maps four stock photos onto six categories; there is now one image per category. They make no claim to match the original photos.
+**Reconstructed reference material**
 
-Planned, not yet made (to be confirmed in their steps):
+The original sources were not available, so these were rebuilt. None of them claims to match the original.
+- [DEVIATION] 6.4: the six placeholder images are new flat silhouettes, drawn with libvips by `script/generate_placeholder_images.rb`, because `misfitai-mobile/assets/stock/` is not available. The doc maps four stock photos onto six categories; there is now one image per category.
+- [DEVIATION] 9.4: the 15 demo images in `db/seeds/images/` are generated silhouettes in the garment's colour, drawn by `script/generate_seed_images.rb`, not product photos. That keeps the seed free of third-party image rights and of AI calls. They can be replaced with real photos (same file names) at any time; the seed re-attaches any image whose checksum changed.
+- [DEVIATION] 6.5: the lists `STOPWORDS`, `NEGATIVE_WORDS`, `APPAREL_HINTS` and `GARMENT_NOUNS` (`app/services/wardrobe/search/word_lists.rb`) are rebuilt from the role 6.5 gives each one, because `backend/garment_search_filter.py` is not available. `filter_and_rank_spec` pins the algorithm with cases whose outcome follows from the doc.
+- [DEVIATION] 8.4: the inputs in `spec/services/receipts/text_parser_spec.rb` are written from the 6.12 algorithm, because the original `receipt_parser.py` tests are not available.
 
-- [DEVIATION] 6.5: `STOPWORDS`, `NEGATIVE_WORDS`, `APPAREL_HINTS` and `GARMENT_NOUNS` (`app/services/wardrobe/search/word_lists.rb`) are rebuilt from the role 6.5 gives each list, because `backend/garment_search_filter.py` is not available. They make no claim to match the original lists; `filter_and_rank_spec` pins the algorithm with cases whose outcome follows from the doc.
+**Behaviour**
+- [DEVIATION] 6.12: the receipt review is a list of editable cards instead of a table, so it works at 390 px. It has the fields 6.12 lists.
+- [DEVIATION] 6.6: the response schema gains an optional `confidence` number. It is not required, and the prompt text is unchanged. Drafts store `confidence` and `needs_confirmation`, and a draft is flagged "Please double-check" when its confidence is under 0.75 (the receipt threshold in 6.12) or when its category fell back to `top`.
+- [DEVIATION] 6.12: `Receipts::TextParser` fixes three bugs of the original (approved in Step 8). Specs pin each fix:
+  - Sizes are looked for after removing prices, SKUs and the leading quantity. The original ran `SIZE_RE` over the whole line, so a price gave a size ("$39.90" became size "39").
+  - `NON_ITEM_TERMS` match whole words, with an optional plural. The original matched substrings, so "card" excluded every "Cardigan" line.
+  - A priced line that names no garment ("Coffee 3.50") is still returned, but it is flagged, marked `category_found: false`, and starts unselected.
+  - Also: names lose hyphens left at their ends by the removals.
+  - Kept as in 6.12: the fallback hint is a whole word ("trouser" misses "trousers"), and its 24-character snippet can merge nearby words.
 
-## Decisions made where the doc was silent
+## 6. Decisions made where the doc was silent
 
-- [DECISION] Manual add submit button: "Add to wardrobe".
-- [DECISION] Manual add validation copy uses the Rails defaults: "Name can't be blank", "Name is too long (maximum is 80 characters)", "Category can't be blank".
-- [DECISION] The photo-intake commit button is "Add selected" (12.1 sample), not "Commit" (6.6 flow label). The flash is "N items added", singular "1 item added".
-- [DECISION] Photo upload errors reuse the 6.11 avatar copy: "Image too large" and "Please upload a JPEG, PNG, WebP or HEIC image".
-- [DECISION] A failed photo analysis shows a "Try again" button that returns to the upload form. There is no retry route for photo intakes in 7.1.
-- [DECISION] A receipt over 10 MB shows "File too large".
-- [DECISION] 12.3 says "All brands (SEARCH_BRANDS, 50)" but lists 51 names. All 51 are kept, in the doc's order; none is dropped without a reason.
-- [DECISION] Garments created by "Given my wardrobe contains:" use `source: manual` and `image_status: placeholder` (no image is attached). Blank cells mean "not set" so column defaults apply; an unknown column raises.
-- [DECISION] Enums stay as string columns with `inclusion` validations (the Phase 1 convention) rather than Rails `enum`. Status predicates on `GarmentDraft` and `IntakeBatch` are defined from their `STATUSES` constants.
-- [DECISION] `garment_drafts.status` and `intake_batches.status` default to `pending` through the Rails attribute API, not a database default, to keep the schema change limited to the approved G6 migration.
-- [DECISION] Blank strings from forms are stored as nil on `Garment` (`normalizes`), so `formality: nil` keeps meaning "untagged" for the engine (6.8.3) and an empty select never fails validation. The manual-add defaults (casual, all-season) are applied by the form/service in Step 4, not by the model.
-- [DECISION] A draft is committable when selected and `pending` or `ready`. A draft whose image failed falls back to a placeholder and stays committable (6.6); `failed` is reserved for drafts that cannot be committed.
-- [DECISION] Stale cleanup (5.3): drafts older than 24 hours that are not `committed`, and batches older than 24 hours. What happens to a batch after commit is decided in Step 7.
-- [DECISION] The add panel opens on "Describe item" (Manual). Photo AI and Receipt render a "Coming soon" panel until Steps 7 and 8; the Search sub-tab until Step 6. Inactive panels are rendered `hidden` and switched by `shared--tabs`.
-- [DECISION] Card actions ("Hide from outfits" / "Show in outfits", "Delete") are visible buttons on the card instead of a collapsed menu. A `<details>` menu hides its buttons from rack-test and from a first glance on mobile.
-- [DECISION] The name field has no `maxlength`; the model's 80-character limit shows a hint and an error. With `maxlength`, browsers (and Capybara's rack-test) silently cut the name instead.
-- [DECISION] Blank category gives one error ("Category can't be blank"): the inclusion check now skips blank values (`Garment` model, tightened after Step 3).
-- [DECISION] The "Next: plan your week" link and the planning hint count visible garments only (`current_user.garments.visible.outfit_ready?`), the same rule as the planner's generate guard (6.7), so the link never leads to a guard error. Hiding or showing a garment refreshes the header (Turbo Stream response and `SetHidden` broadcast).
-- [DECISION] A filtered view with no matches shows "No {category} items in your wardrobe yet."; the doc's empty-closet copy is used when the wardrobe is empty.
-- [DECISION] `PATCH /garments/:id/hide` without `hidden` hides (keeps Phase 1's behavior).
-- [DECISION] Form objects are built with `Garment.new`, never `current_user.garments.new`: an unsaved record must not join the user's loaded association, where `size`/`none?` would count it. Found by the acceptance tests.
-- [DECISION] The "Generate a product image" checkbox is shown (checked) but has no effect until Step 5 wires it to `GenerateGarmentImageJob`.
-- [DECISION] `AddGarments` / `StarterImport` save all items in one transaction (an invalid item raises `ActiveRecord::RecordInvalid` and nothing is kept), queue the image jobs with `ActiveJob.perform_all_later` after the transaction, and return `Array<Garment>`. With images requested the status is `pending` (6.3), otherwise `placeholder`. Unknown item keys are ignored; `color` is accepted for `color_primary`. Phase 4 should validate onboarding rows before calling.
-- [DECISION] Image jobs from `AddGarments` are queued in `ActiveRecord.after_all_transactions_commit`, so they wait for every open transaction, including a caller's outer one, and a rollback queues nothing. The app keeps `enqueue_after_transaction_commit` off, so this is explicit. Specs cover the rollback and the outer-commit case.
-- [DECISION] Duplicate image work (Step 5 review):
-  - `GenerateGarmentImageJob` uses Solid Queue `limits_concurrency` (one run per garment, key `garment-image-<id>`, 10-minute window). A second run waits, then sees the ready image and stops without an AI call.
-  - The attach happens under a row lock and is skipped when a ready image is already there, so a finished image is never overwritten.
-  - `retry_image` claims the garment with one compare-and-set `UPDATE` (`failed` -> `pending`), so simultaneous clicks queue one job.
-- [DECISION] `StarterImport` defaults the season to `all_season` (12.3) and accepts the catalog's `sub_category`.
-- [DECISION] The receipt price note (`fit_notes = "Receipt price: $%.2f"`, 6.12) is built by the receipts caller in Step 8, not by `AddGarments`.
-- [DECISION] After the last transient failure the garment is `failed` (not `placeholder`), so the card can offer "Retry image" (4.3). Placeholder means "no image by design" (switched off, over quota, blocked) and offers no retry.
+**Copy and UI**
+- [DECISION] The manual-add submit button reads "Add to wardrobe".
+- [DECISION] Validation messages are the Rails defaults ("Name can't be blank", "Name is too long (maximum is 80 characters)", "Category can't be blank"). A blank category gives one error, not two.
+- [DECISION] The photo-intake commit button is "Add selected" (the 12.1 sample), not "Commit". The flash reads "N items added", or "1 item added".
+- [DECISION] Photo upload errors reuse the 6.11 avatar copy ("Image too large", "Please upload a JPEG, PNG, WebP or HEIC image"). A receipt over 10 MB shows "File too large".
+- [DECISION] A failed photo or receipt shows "Try again", which discards the batch and returns to the form. There is no retry route in 7.1.
+  - The vision cap message is "You've reached today's photo analysis limit. Please try again tomorrow."
+  - An unreadable stored photo gets "We couldn't read that photo. Please upload a JPEG, PNG, WebP or HEIC image."
+- [DECISION] 12.3 says "SEARCH_BRANDS, 50" but lists 51 brands. All 51 are kept, in the doc's order.
+- [DECISION] The add panel opens on "Describe item" (Manual). Inactive panels are rendered `hidden` and switched by `shared--tabs`.
+- [DECISION] Card actions ("Hide from outfits" or "Show in outfits", and "Delete") are visible buttons, not a `<details>` menu, which would hide them from rack-test and from a first glance on mobile.
+- [DECISION] The name field has no `maxlength`, because browsers would silently cut the name. The 80-character limit is enforced by the model instead, with a hint and an error.
+- [DECISION] "Next: plan your week" and the planning hint count visible garments only (the 6.7 planner guard), so the link never leads to a guard error.
+- [DECISION] A filtered view with no matches shows "No {category} items in your wardrobe yet."
+- [DECISION] `PATCH /garments/:id/hide` without `hidden` hides the garment, as in Phase 1.
+- [DECISION] Draft image broadcasts replace only the image area and the progress bar, so edits made while images arrive are kept.
+- [DECISION] `turbo_stream_from` sits inside the `photo_intake` and `receipt_intake` frames, because Turbo keeps only the frame's contents when the frame navigates.
+
+**Models and data**
+- [DECISION] Enums stay as string columns with `inclusion` validations (the Phase 1 convention). Status predicates are defined from the `STATUSES` constants.
+- [DECISION] `garment_drafts.status` and `intake_batches.status` default to `pending` through the Rails attribute API, not a database default. This keeps the schema change to the approved G6 migration.
+- [DECISION] Blank form strings are stored as nil on `Garment`, so `formality: nil` keeps meaning "untagged" for the engine (6.8.3).
+- [DECISION] Form objects are built with `Garment.new`, never `current_user.garments.new`, so an unsaved record never joins the loaded association and is never counted.
+- [DECISION] Garments created by the "Given my wardrobe contains:" step use `source: manual` and `image_status: placeholder`.
+- [DECISION] Demo-seeded garments are identified by `source: "starter"` plus a `demo-seed:<image file>` `source_url`, not by name, so the seed never updates a garment the user created. This needs no schema change.
+- [DECISION] A draft is committable when it is selected and `pending` or `ready`. A draft whose image failed keeps the placeholder and stays committable. `failed` means it cannot be committed.
+
+**Images**
+- [DECISION] Image status:
+  - `placeholder` means "no image by design" (manual add without the checkbox, switched off, over quota, blocked). It offers no retry.
+  - `failed` means the last transient retry failed. The card offers "Retry image".
 - [DECISION] `IMAGE_GEN_SPACING_SEC` is not used: each job generates one image, and production runs `ai_images` with one thread (6.4 rule 5).
-- [DECISION] `garments/_thumb` takes an optional `class:` with the default `h-full w-full object-cover`. Broadcasts re-render it with the default, so callers should size the wrapping element.
-- [DECISION] `ImageSearch` results also carry `thumbnail_url` (the provider's thumbnail, used for the preview), in addition to the documented `image_url`, `title`, `source_url`. The server downloads only `image_url`, and only after the user picks it.
-- [DECISION] When a picked result has no category, `AddResult` takes the category of the chosen kind, else a garment noun in the title or keywords (`WordLists::CATEGORY_BY_NOUN`), else shows "Category can't be blank". Formality and season default like manual add (casual, all-season).
-- [DECISION] `SafeFetcher` only allows the default ports (80 for http, 443 for https) and no credentials in URLs, on every hop.
-- [DECISION] Search errors answer with the status the error implies (422 missing query, 502 provider failure, 503 not configured, 504 timeout or connection failure) and render inside the results frame. SerpAPI's 200 "Google hasn't returned any results" is an empty result, not an error.
-- [DECISION] The remote import retries temporary failures (`Media::TransientFetchError`), three attempts in all with growing waits, keeping the garment `pending` meanwhile; after the last attempt, and immediately for any permanent failure (other 4xx, unsafe URL, too large, not an image), it keeps the placeholder (6.5). It runs on the `default` queue (no AI involved).
-- [DECISION] Search result links that carry an `api_key` parameter, or our key itself, are dropped before anything is rendered or stored.
-- [DEVIATION] 6.6: the response schema gains an optional `confidence` number (not required; prompt text unchanged) so the review can flag uncertain items. Drafts store `confidence` and `needs_confirmation`; a draft is flagged "Please double-check" when confidence is under 0.75 (the receipt threshold, 6.12) or when its category fell back to `top`.
-- [DECISION] Photo commit (`Wardrobe::PhotoIntake::Commit`):
-  - Edits (selected, name, category) are sent with the commit form, so the review works without JavaScript; `PATCH /wardrobe/drafts/:id` saves one draft on its own.
-  - Runs under a lock on the batch and only takes committable drafts, so committing twice never duplicates garments ("No new items to add.").
-  - The draft's image blob is attached to the garment and detached from the draft without purging. Rails would also refuse to purge a blob still attached elsewhere (its purge rescues the foreign-key error), so this is defence in depth that also avoids failing purge jobs.
-  - A draft whose image is still generating becomes a `pending` garment, recorded on the draft (`attrs["garment_id"]`, no schema change). `GenerateDraftImageJob` hands its image to that garment when it finishes, whether its AI call was in flight during the commit or had not started, so one AI call serves both. A `GenerateGarmentImageJob` queued 10 minutes later is the safety net if the draft job never delivers (failure, crash, purge): it finds the garment ready and stops without an AI call, or makes the image. A second AI call happens only in that failure case. Image-changed broadcasts are shared by the three image jobs (`Wardrobe::GarmentBroadcasts`).
-  - Invalid edits (e.g. a blank name) roll everything back and show the error (422).
-  - Success goes to the wardrobe page ("1 item added" / "N items added").
-- [DECISION] Stale batches (5.3 "older than 24 hours") are measured from the last activity, `updated_at`, which the intake jobs touch, so a batch still being processed is never purged; a batch idle for more than 24 hours (including one stuck in processing) is. `PurgeStaleDraftsJob` locks each batch (the lock `Commit` takes), checks it is still stale, then destroys it with its drafts and files; a batch already gone is skipped, so reruns are harmless. Committed drafts no longer hold images. `ExtractGarmentsJob` ends quietly if its batch is removed mid-run, and `GenerateDraftImageJob` is discarded for a removed draft; neither recreates rows.
-- [DECISION] Upload memory: Rack streams the multipart upload to a temp file; the controller checks size (no read) and type (first 64 KB) before anything else; Active Storage streams the upload; the job downloads the blob to a temp file (`blob.open`) and `ImagePreparer` reads from disk (type from the first 64 KB, pixel count from the header before decoding, libvips thumbnail from the file). The photo is never held whole in Ruby memory.
-- [DECISION] A failed photo shows "Try again", which discards the batch and returns to the upload form. The daily vision cap shows "You've reached today's photo analysis limit. Please try again tomorrow." An unreadable stored photo shows "We couldn't read that photo. Please upload a JPEG, PNG, WebP or HEIC image."
-- [DECISION] Draft image broadcasts replace only the image area and the progress bar, never the inputs, so edits made while images arrive are kept.
-- [DECISION] `turbo_stream_from` sits inside the `photo_intake` frame: when the frame navigates, Turbo keeps only the frame's contents, so a subscription outside it would be lost on the standalone page (found by the browser test).
-- [DECISION] `IntakeBatchesController#commit` handles photo batches only until Step 8 adds receipts.
-- [DECISION] Receipt input limits: 10 MB per file (6.12); pasted text up to 20,000 characters; PDF text from the first 20 pages (6.12) and at most 50,000 characters; a text file is read up to 20,000 characters. The kind of file is decided from its bytes, never its name or Content-Type.
-- [DECISION] A receipt with no items found ends as a failed batch ("We couldn't find any clothing items on that receipt.") with "Try again". The receipt image job uses its own quota and unreadable messages, and prepares images at up to 2400 px (photos: 1600) so small print stays legible.
-- [DECISION] Edited receipt prices accept "39.90", "$39.90" or "39,90"; anything else shows "Price must be a number like 39.90" and saves nothing. A blank price means unknown (no price note).
-- [DEVIATION] 6.12 `Receipts::TextParser` fixes three bugs of the original (approved). Specs pin each:
-  - Sizes are looked for after removing prices, SKUs and the leading quantity. The original ran `SIZE_RE` over the whole line, so a price gave a size from its digits ("$39.90" -> "39", "$120.00" -> "00"). Real sizes (M, XL, 10, 32, 38, 9.5, W32L30) are still found.
-  - `NON_ITEM_TERMS` match whole words, with an optional plural ("cards", "taxes", "thanks"). The original matched substrings, so "card" excluded every "Cardigan" line.
-  - A priced line that names no garment (e.g. "Coffee 3.50") is still returned, but with `category_found: false`, always flagged, and its draft starts unselected, so "Add selected" does not add it unless the user ticks it. The original made it a selected row like any garment.
-  - Names lose hyphens left at their ends by the removals ("SKU: AB-12" used to leave "Linen Shirt -").
-  - Kept as in 6.12: the fallback hint is a whole word ("trouser" misses "trousers") and its 24-character snippet can merge nearby words.
-- [DECISION] PDF parsing stays in the request (6.12) with four bounds: 10 MB file (checked before reading), first 20 pages, 50,000 characters, and two resource guards in `Receipts::PdfText`: (1) before a page's text is extracted, its content streams and form XObjects are inflated in 4 KB chunks against a shared 20 MB budget, so a compression bomb is refused before pdf-reader inflates it whole; (2) the whole read is limited to 5 seconds (`Timeout`; pdf-reader is pure Ruby, so it can be interrupted, and Ruby 3.3's timeout cannot be swallowed by a `rescue StandardError` inside the gem). Both end in "That PDF is too large or complex to read. Try pasting the receipt text instead."
-- [DECISION] Extra scenarios beyond the 12.1 minimum: a category is required, an 80-character name limit, the image kill switch and the blocked-image fallback, a private-address image is never fetched (4.4), the 6-draft cap, draft image failure, discard, the source photo is purged, and the feature flags hide the Photo AI and Receipt tabs.
+- [DECISION] `garments/_thumb` takes an optional `class:`, defaulting to `h-full w-full object-cover`. Callers should size the wrapping element, because broadcasts re-render the partial with the default.
+- [DECISION] `StarterImport` defaults the season to `all_season` (12.3) and accepts the catalog's `sub_category`. With images requested the status is `pending` (6.3), otherwise `placeholder`.
+- [DECISION] `AddGarments` and `StarterImport` save every item in one transaction and queue image jobs in `ActiveRecord.after_all_transactions_commit`, so they wait for every open transaction, including a caller's outer one. A rollback queues nothing. Unknown item keys are ignored, and `color` is accepted for `color_primary`. Phase 4 should validate onboarding rows before calling.
 
-## Known issues (Phase 1, to file; not blocking Phase 2)
+**Search**
+- [DECISION] Search results also carry `thumbnail_url` (the provider's thumbnail) for the preview. The server downloads only `image_url`, and only after the user picks it.
+- [DECISION] When a picked result has no category, `AddResult` takes the category of the chosen kind. Failing that, it uses a garment noun from the title or keywords; failing that, it shows "Category can't be blank".
+- [DECISION] Search errors answer with the status the error implies: 422 (missing query), 502 (provider failure), 503 (not configured) or 504 (timeout or connection failure). They render in the results frame. SerpAPI's 200 "no results" response counts as an empty result.
 
-- Rails 8.0 end of life on 2026-11-07 (see above).
-- `spec/factories/users.rb` `:user_profile` factory always fails: it builds a user, whose `after_create` already creates the profile, then saves a second one (unique index on `user_profiles.user_id`). Found by `FactoryBot.lint`; the Phase 2 lint is scoped to Phase 2 factories until it is fixed.
-- `ApplicationJob` has no default queue or retry/discard policy.
-- `AVATAR_IMAGEN_MODEL` is not read; avatars use `IMAGEN_MODEL` (Phase 4 concern).
-- `APP_HOST` is not read (OmniAuth `full_host`, mailer host is hardcoded to `example.com`).
+**Receipts**
+- [DECISION] Receipt input limits:
+  - 10 MB per file;
+  - pasted text up to 20,000 characters;
+  - PDF text from the first 20 pages, at most 50,000 characters;
+  - text files read up to 20,000 characters.
+  - The kind of input is decided from its bytes, never its name or Content-Type.
+- [DECISION] A receipt with no items found ends as a failed batch ("We couldn't find any clothing items on that receipt."). Receipt images are prepared at up to 2400 px (photos: 1600 px) so small print stays legible.
+- [DECISION] Edited receipt prices accept "39.90", "$39.90" or "39,90". Anything else shows "Price must be a number like 39.90" and saves nothing. A blank price means unknown, so there is no price note. The 6.12 price note (`fit_notes = "Receipt price: $%.2f"`) is built by `Receipts::Commit`.
 
-- `app/views/shared/_pill_group.html.erb`: its magic comment `<%# locals: name:, options:, selected: nil, multiple: false %>` is not strict-locals syntax (no parentheses), so the defaults are never applied and any caller that omits `multiple:` or `selected:` raises `NameError`. Phase 2 passes both explicitly.
+**Tests**
+- [DECISION] The extra scenarios beyond the 12.1 minimum cover:
+  - the category requirement and the 80-character limit;
+  - the image kill switch and the blocked fallback;
+  - a private-address image is never fetched;
+  - the 6-draft cap, draft image failure, discard, and the source-photo purge;
+  - the feature-flag tabs;
+  - one `@javascript` scenario per intake path.
 
-## Concurrency limitations (image generation)
+## 7. Changes to Phase 1 infrastructure (Phase 1 issues found and fixed)
 
-- `limits_concurrency` only works with the Solid Queue adapter (development and production). The test adapter ignores it; the row-lock overwrite guard is what the specs exercise.
-- If one run lasts longer than the 10-minute concurrency window (a very slow Imagen call plus retries), a second run may start and make a second AI call. Its image is then discarded by the overwrite guard, so the cost is one extra call, never a replaced image.
-- Several jobs for one garment can still be queued (e.g. two manual adds of separate garments are fine; one garment queued twice runs twice in sequence). The second run makes no AI call because the image is ready.
-- The double-click retry spec runs requests one after another, so it would also pass without the compare-and-set; the guard against truly simultaneous requests rests on the single `UPDATE ... WHERE image_status = 'failed'`.
+### Fixed on behalf of Phase 1 (owner to notify: Dev 1)
 
-## Corrections to earlier notes
+Each fix has a regression spec that fails on the old code, unless stated.
 
-- G9 (Step 0) was a false alarm: libvips is loaded at boot (through `image_processing`), so `config/initializers/vips.rb` does apply `cache_set_max(0)` and `concurrency_set(1)` (checked in production and test).
+- **AI error classes did not autoload** (`app/services/ai/{error,transient_error,content_blocked_error,quota_exceeded_error,disabled_error}.rb`).
+  - They were defined inside `ai/client.rb`, so a job's class-level `retry_on Ai::TransientError` raised `NameError` in development and test. CI hid it by eager loading.
+  - Each class now has its own file with the same definition, and `bin/rails zeitwerk:check` passes.
+- **Media error classes had the same problem** (`app/services/media/{invalid_image,unsafe_url,fetch}_error.rb`). `BLOCKED_HOSTS` moved to `Media::SafeFetcher::BLOCKED_HOSTS`; nothing referenced the old constant.
+- **The flash container was destroyed by the first Turbo Stream error** (`app/controllers/application_controller.rb`). `handle_application_error` used `turbo_stream.replace("flash", ...)` on a partial with no `#flash` wrapper. It now uses `update`. Spec: `spec/controllers/application_controller_spec.rb`.
+- **`Ai::Client::Fake#generate_json` and `#generate_text` skipped the quota checks**, so the vision cap and global budget were never tested (3.7 says the fake exists so "the budget logic gets tested too"). Both now call `check_quotas!`, as Vertex does.
+- **AI fixture PNGs were corrupt** (`spec/fixtures/ai/*.png`): all ten were 1x1 PNGs with a bad zlib checksum. They are regenerated as valid 64x64 PNGs, one colour per kind (8.2 allows refining fixtures).
+- **Missing favicon links** in `app/views/layouts/application.html.erb`. Chrome requested `/favicon.ico`, the routing error was re-raised by Capybara, and every `@javascript` scenario failed.
+- **Phase 1 gap list from Step 0:**
+  - G1: the AI extraction fixtures now hold `items` shaped like the 6.6 and 6.12 schemas.
+  - G2: `config/options.yml` has the full 21-item starter catalog plus `search_brands`, `search_materials` and `search_kinds_by_category`.
+  - G3: the test Action Cable adapter is `async`; RSpec swaps in the test adapter per example.
+  - G4: "When background jobs finish" drains the queue, and under rack-test it then reloads the page after a GET.
+  - G5: `Media::SafeFetcher` is hardened (section 9).
+  - G6: the `garment_drafts.attrs` default (section 10).
+  - G8: the `.pill`, `.tab`, `.badge`, `.spinner` and `.input` CSS.
+  - G9 was a false alarm: libvips loads at boot, so `config/initializers/vips.rb` applies.
 
-## PDF limitations for deployment
+- **Demo account seed** (`db/seeds.rb`, new `db/seeds/demo_user.rb`). Spec: `spec/seeds/demo_user_spec.rb` (each case fails on the old seed).
+  - The seed printed `demo@misfit.ai / <password>`, which lands in Heroku logs. It now prints only the email.
+  - Production fell back to the known password `changeme`, and `db:prepare` (run by `bin/docker-entrypoint` and `bin/setup`) seeds every new database, so a deploy could create that account by accident. In production now:
+    - with no `DEMO_PASSWORD` (or a blank one), the demo account and its wardrobe are skipped, with a message, and the deploy carries on;
+    - a known password (`changeme`, `password`, `demo`, `misfit`, in any case) or one under 12 characters stops the seed with `DemoUser::InsecurePasswordError`, before anything is created or changed, including an existing demo account's password.
+  - Development and test keep the `changeme` default from `.env.example`.
 
-- The inflation budget covers page content streams and form XObjects, the streams text extraction decodes most. Fonts and their ToUnicode maps are decoded by pdf-reader without a pre-check; they are bounded by the 10 MB file limit and the 5-second timeout.
-- `Timeout` interrupts the request thread at an arbitrary point. That is acceptable here (pdf-reader works on an in-memory copy and holds no locks or connections), but the block must stay free of database work.
-- A PDF still costs up to ~5 seconds of one Puma thread; Rack::Attack limits receipt uploads per user.
+### Other changes to Phase 1 files
 
-## Step 9 review
+- `config/brakeman.ignore`: one entry, the Rails 8.0 pending-EOL warning (fingerprint `98b26f60…22db42`). Every other check stays on. **Rails must be upgraded before 2026-11-07**: on that date the warning changes code and fingerprint, and CI fails again until Rails is upgraded.
+- Cucumber always uses the fake AI adapter (`features/support/ai_fake.rb`), and `ENV` is restored after each scenario (`features/support/env_sandbox.rb`).
+- `spec/examples.txt` is untracked and in `.gitignore`.
+- The garment factory moved to `spec/factories/garments.rb`. Its default `image_status` is now `placeholder`, since no image is attached.
+- Phase 2 cases were added to `spec/requests/authorization_spec.rb`.
+- New test support:
+  - `FakeDns`, so tests make no DNS lookups;
+  - a cache emptied per test;
+  - `features/support/browser_network.rb`, so browsers may load only the test server.
+- `config/initializers/content_security_policy.rb`, `config/initializers/rack_attack.rb`, `config/routes.rb` and `config/initializers/filter_parameter_logging.rb` changed for the reasons in section 9.
 
-Fixed (each with a regression spec that fails on the old code):
-1. Unauthenticated Active Storage direct uploads: `POST /rails/active_storage/direct_uploads` (routed by Rails, no sign-in) created blobs and returned signed upload URLs to the bucket. The app never uses direct uploads; `config/routes.rb` now answers 404. Blob redirect and representation routes are unchanged.
-2. Pasted receipt text was written to the request logs; `receipt_text` is now in `filter_parameters`.
-3. Fixed on behalf of Phase 1: `Ai::Client::Fake#generate_json` and `#generate_text` skipped the quota checks Vertex performs, so the daily vision cap and global budget for photo and receipt analysis were never tested (3.7: the fake exists so "the budget logic gets tested too"). They now call `check_quotas!` like Vertex.
-4. G10: hourly per-user limits of 60 (4.4), for the AI posts (`/wardrobe/photo_intakes`, `/wardrobe/receipts`, `/avatar`, `/outfit_previews`) and, separately, for searches. `/outfit_previews` is the 7.1 route of the doc's `/outfits/*/preview`.
-5. `ExtractGarmentsJob` committed drafts and the batch's `ready` status in separate transactions; a worker dying in between (Solid Queue re-runs claimed jobs of dead processes) would add the drafts again. Now one transaction under the batch lock, skipped if the batch is finished. `Receipts::Intake.finish` has the same guard.
-6. The intake failure handler re-inserted rolled-back drafts: drafts created through `@batch.garment_drafts` stay in the association after a rollback, and `mark_failed!` saved them again. `IntakeBatchJobSupport#fail_batch` now reloads the batch first.
-7. Photo and receipt-image uploads created the batch, attached the file and queued the job in three unguarded steps; a storage failure left a `processing` batch with no file or job. Now `IntakeUpload#create_upload_batch` (controller concern): save the batch, attach the file outside any transaction (Active Storage stores it in an after-commit callback, so it is stored when `attach` returns), then queue the job; if attaching or queueing fails, the stored file is purged and the batch removed. A first attempt wrapped all three in one transaction; that let a Solid Queue worker pick up the job at commit while the request was still uploading the file to GCS, so the job could fail the batch as unreadable. A spec checks the file is stored when the job is queued (fails on the transaction version) and that a queueing failure leaves no batch, blob row or stored file. A rolled-back transaction never stores a file (verified), so no orphaned objects come from rollbacks. `Receipts::Intake.from_text` (no file) creates the batch and its drafts in one transaction.
-9. Action Cable had no connection authentication, so a stream name copied from a page (permanent, never revoked, and carrying receipt rows in broadcasts) worked without signing in and after sign-out. `ApplicationCable::Connection` now requires the Warden session's user, and `UserStreamAuthorization` (prepended to `Turbo::StreamsChannel` in `config/initializers/turbo_stream_authorization.rb`) accepts a subscription only when the stream's first part is that user. Phases 3 and 4 must keep streams user-first (`[user, :planner]`, `[user, :avatar]`), as 2.4 specifies. Specs in `spec/channels/cable_authorization_spec.rb`; all browser scenarios pass over the authenticated socket.
-8. `ExtractGarmentsJob` and `Receipts::ParseImageJob` allow one run per batch (`limits_concurrency`).
+## 8. Known issues: remaining Phase 1 issues for Dev 1
 
-Verified, no change needed (with specs):
-- Authorization sweep: every Phase 2 member route (garments, photo batches, drafts, receipts, commit, discard) returns 404 for another user and changes nothing; uploaded source files are never linked from any page; jobs act only on the records their ids name and derive the user from them.
-- CSRF: forms rendered by broadcasts carry the renderer's token, but Turbo sends the page's token in `X-CSRF-Token`, which Rails accepts; a forged token without the header is still rejected (checked with forgery protection on).
-- Non-UUID draft ids in review edits are ignored.
-- Blocking `/rails/active_storage/direct_uploads` breaks nothing: no form or script uses direct uploads (no `direct_upload:` option, no Active Storage JS pinned); every upload is a normal multipart post. A spec checks the upload forms.
-- Earlier steps already cover SSRF (Step 6), upload validation and memory (Step 7), PDF bounds (Step 8), job retries, idempotency and duplicate-call guards (Steps 5 to 8).
+None of these blocks Phase 2. All are to be filed as `phase-1` issues.
 
-## Residual risks (accepted, for deployment)
+| Issue | Severity | Workaround |
+|---|---|---|
+| Rails 8.0 reaches end of life on 2026-11-07, and CI's Brakeman step will fail from that date | High (date-bound) | Upgrade Rails to 8.1 before 2026-11-07 |
+| The 9.4 Phase 1 seed (a demo user "with a filled-in profile and measurements") is missing. The seed creates the user only, so the Phase 3 engine sees an empty profile | Medium (affects the Phase 3 demo) | Add profile and measurements to the Phase 1 seed |
+| `:user_profile` factory always fails: the user's `after_create` already creates a profile, and the factory saves a second one (unique index) | Low | The Phase 2 `FactoryBot.lint` is scoped to Phase 2 factories |
+| `shared/_pill_group`'s magic comment is not strict-locals syntax (no parentheses), so its defaults are never applied | Low | Callers pass `selected:` and `multiple:` explicitly |
+| `ApplicationJob` has no default queue or retry/discard policy | Low | Each Phase 2 job declares its own |
+| `AVATAR_IMAGEN_MODEL` is not read; avatars use `IMAGEN_MODEL` | Low (Phase 4) | None needed yet |
+| `APP_HOST` is not read; the mailer host is hard-coded to `example.com` | Low | None in Phase 2 (no mail) |
 
-- Active Storage blob and representation URLs are signed but do not expire, so anyone holding a garment or draft image link can open it (the redirect goes to a 1-hour signed storage URL). Images are product photos; uploaded source photos and receipts are never linked.
+## 9. Security and reliability decisions
+
+**Authorization**
+- Every Phase 2 member route looks records up through `current_user`, so another user's garment, batch, draft or receipt gives 404 and changes nothing.
+- Jobs act only on the records their ids name, and take the user from them.
+- Uploaded source photos and receipts are never linked from any page. Photos are purged once the batch is ready or failed.
+
+**Action Cable**
+- `ApplicationCable::Connection` requires the Warden session's user.
+- `UserStreamAuthorization` (prepended to `Turbo::StreamsChannel` by `config/initializers/turbo_stream_authorization.rb`) accepts a subscription only when the stream's first part is that user.
+- Before this, a signed stream name copied from a page worked without signing in and after sign-out.
+- **Phases 3 and 4 must keep their streams user-first** (`[user, :planner]`, `[user, :avatar]`), as 2.4 specifies.
+
+**Uploads**
+- Every upload is checked before anything is stored: missing, empty, over the size limit (15 MB for photos, 10 MB for receipts), or a type not allowed by content sniffing (first 64 KB). Names and Content-Type are ignored.
+- Pixel count is checked from the header (50 MP) before decoding. Images are auto-rotated by EXIF, limited to 1600 px (2400 px for receipts), and converted to sRGB JPEG.
+- The upload is never held whole in Ruby memory: Rack streams it to a temp file, Active Storage streams it, and the job reads from disk.
+- `POST /rails/active_storage/direct_uploads` answers 404. It was unauthenticated and handed out signed bucket URLs, and the app never uses direct uploads.
+
+**SSRF**
+
+`Media::SafeFetcher` checks every hop: the first URL and each of at most 3 redirects. Each hop must:
+- use http or https on the default port;
+- carry no credentials in the URL;
+- have a host outside `BLOCKED_HOSTS`.
+
+Beyond those checks:
+- `ssrf_filter` refuses private, loopback, link-local, shared and metadata addresses, and connects to the vetted IP, so DNS rebinding is not possible.
+- Only a 2xx response counts.
+- The body is streamed under the byte limit, with an overall deadline.
+- Error messages never contain the URL.
+
+**Search**
+- Search preview thumbnails are rendered only from the hosts in `config.x.search_thumbnail_hosts`, over https and with `referrerpolicy="no-referrer"`. The CSP allows exactly those hosts.
+- Result links that carry `api_key` or our key are dropped.
+
+**PDF**
+- PDFs are parsed in the request, under four bounds:
+  - a 10 MB file, checked before reading;
+  - the first 20 pages;
+  - at most 50,000 characters;
+  - a 5-second timeout.
+- A 20 MB inflation budget is checked chunk by chunk before pdf-reader inflates a page's content, so a compression bomb is refused early.
+
+**Rate limits (Rack::Attack)**
+- Garment search: 10 per minute and 60 per hour per user.
+- Adding a search result: 30 per minute per user.
+- AI posts (photo intake, receipts, avatar, outfit previews): 10 per minute and 60 per hour per user.
+
+**Logs:** `receipt_text` is in `filter_parameters`.
+
+**Reliability**
+- **Jobs are queued only after commit.** That includes a caller's outer transaction, so a rollback queues nothing.
+- **Upload batches are created in a fixed order:** save the batch, attach the file (stored when `attach` returns), queue the job. If attaching or queueing fails, the stored file is purged and the batch removed, so no `processing` batch is ever left without a file or job.
+- **No duplicate AI calls or overwrites:**
+  - Every image and intake job uses `limits_concurrency`, one run per record.
+  - Attaches happen under a row lock and are skipped when a ready image exists.
+  - `retry_image` claims the garment with one compare-and-set `UPDATE`.
+  - A draft committed while its image was generating hands the image to its garment, so one AI call serves both. A `GenerateGarmentImageJob` queued 10 minutes later is the safety net.
+- **Idempotent intake:**
+  - `ExtractGarmentsJob` writes the drafts and the `ready` status in one transaction under the batch lock, and skips a finished batch, so a re-run after a worker crash adds nothing.
+  - Committing twice adds nothing ("No new items to add.").
+  - The failure handler reloads the batch, so rolled-back drafts are never re-inserted.
+- **Stale cleanup:** `PurgeStaleDraftsJob` removes batches idle for more than 24 hours (by `updated_at`, which the jobs touch), each under the batch lock. Re-runs are harmless.
+- **Retries:**
+  - `Ai::TransientError` gets 3 attempts, then the garment is `failed`.
+  - Remote imports retry `Media::TransientFetchError` (timeouts, network errors, 408, 429, 5xx) 3 times, then keep the placeholder.
+  - Disabled, over-quota and blocked calls go straight to the placeholder, with no retry.
+
+## 10. Schema changes after Phase 1
+
+- `db/migrate/20261021230001_add_default_to_garment_drafts_attrs.rb` (G6): `garment_drafts.attrs` gets the `{}` default from 5.3. `null: false` is unchanged. Reversible. `db/schema.rb` changes only the version and that column.
+
+No other migrations. Draft-to-garment links are stored in `garment_drafts.attrs["garment_id"]`, and draft confidence in `attrs["confidence"]`, with no new columns.
+
+## 11. Config vars and flags
+
+No new config vars were introduced. Phase 2 reads these, all already listed in 9.3 and `.env.example`:
+
+| Var | Required | Default | Used by |
+|---|---|---|---|
+| `SERPAPI_KEY` | **yes, for search** | none | `Wardrobe::Search::ImageSearch`. Without it, search answers "Garment search is not configured" (503). Free plan: 250 searches a month. |
+| `VISION_MAX_GARMENT_IMAGES` | no | `6` (clamped to 1..20) | photo intake draft cap |
+| `GARMENT_ASSET_SIZE` | no | `512` | garment and draft image normalization |
+| `HEIC_SUPPORTED` | no | `true` | photo and receipt uploads. Set `false` if the Heroku HEIC check (9.2) fails |
+| `AI_IMAGE_GEN_ENABLED`, `AI_DAILY_IMAGE_LIMIT`, `AI_DAILY_VISION_LIMIT`, `AI_DAILY_BUDGET_CENTS` | Phase 1 | Phase 1 | kill switch and quotas, honored by every Phase 2 AI job |
+| `GCS_BUCKET`, `GOOGLE_*`, `VERTEX_*`, `IMAGEN_MODEL`, `AI_ADAPTER` | Phase 1 | Phase 1 | AI and storage |
+| `DEMO_PASSWORD` | yes, to create the demo account in production | none in production (the account is skipped); `changeme` in development and test | `db/seeds/demo_user.rb`. Production rejects known passwords and anything under 12 characters |
+| `IMAGE_GEN_SPACING_SEC` | no | `1.5` | **not used** (section 6) |
+| `SEARCH_RERANK_ENABLED`, `RECEIPT_LLM_CLEANUP` | no | `false` | **not used**: stretch features not built (section 4) |
+
+Flags (`config/features.yml`; `FEATURE_<NAME>` overrides them):
+
+| Flag | Production state for Phase 2 |
+|---|---|
+| `photo_intake` | **on** (default `true`) |
+| `receipts` | **on** (default `true`) |
+| `onboarding`, `profile`, `avatar`, `outfit_preview` | off (Phase 4 forward slots, unchanged) |
+| `calendar_sync` | on (Phase 3, unchanged) |
+
+Phase 2 leaves no new forward slots (10.3) and changes no flag defaults.
+
+## 12. Deployment instructions
+
+These steps have **not been run yet**. They are the plan for the exit gate.
+
+1. Open the Phase 2 PR (`phase-2` → `main`) and wait for CI to pass on the PR, then on `main` after merging.
+2. Set the Heroku config:
+   ```bash
+   heroku config:set SERPAPI_KEY=<key>                # the only new required var
+   heroku config:set DEMO_PASSWORD=<password>         # 12+ characters, not a known default; without it the seed skips the demo account
+   heroku config:get HEIC_SUPPORTED                   # set to false if the 9.2 HEIC check failed
+   ```
+3. Deploy `main`. The release phase (`Procfile`: `release: bin/rails db:migrate`) runs the G6 migration. It is backward compatible: a column default only.
+4. Seed the demo account and wardrobe: `heroku run bin/rails db:seed`. It can be re-run safely and never prints the password. Check that the output says `Demo user: demo@misfit.ai (password from DEMO_PASSWORD)`, not `Demo user skipped`.
+5. Check that the recurring purge is loaded: `config/recurring.yml` declares `purge_stale_drafts` (daily at 4am) for the Solid Queue scheduler. It needs the worker that runs Solid Queue (`SOLID_QUEUE_IN_PUMA` or a worker dyno, as set up in Phase 1).
+6. Smoke and spend checks: `heroku run bin/rails runner bin/ai_smoke`, `/admin/ai_usage`, and GCP Billing Reports. Record the results in sections 18 and 19.
+7. By hand at 390 px wide, run each intake path once with real AI: manual add with an image, search and add, photo intake, receipt (text, PDF and photo). Watch `heroku logs` for R14 (memory) during the photo and receipt jobs.
+8. Merge this note and push the tag `phase-2-complete`.
+
+Rollback: `heroku rollback vNN`. The migration needs no rollback, because the old code ignores the default. To stop image costs immediately: `heroku config:set AI_IMAGE_GEN_ENABLED=false`. To switch off one intake path: `FEATURE_PHOTO_INTAKE=false` or `FEATURE_RECEIPTS=false`.
+
+## 13. Known limitations and residual risks
+
+**Accepted risks**
+- Active Storage blob and representation URLs are signed but never expire, so anyone holding a garment or draft image link can open it. The redirect goes to a 1-hour signed storage URL. These are product images; source photos and receipts are never linked.
 - Quota checks read today's `ai_calls` before calling, so parallel jobs for one user can go slightly over a cap.
-- A pasted receipt's text stays in `extracted_text_preview` (600 characters) and in drafts until the batch is purged (24 hours after last activity), visible only to its owner.
+- A pasted receipt's text stays in `extracted_text_preview` (600 characters) and in its drafts until the batch is purged, 24 hours after the last activity. Only its owner can see it.
 
-## Schema changes after Phase 1
+**Concurrency**
+- `limits_concurrency` works only with Solid Queue (development and production). The test adapter ignores it, so the specs exercise the row-lock guard instead.
+- If one image run lasts longer than the 10-minute concurrency window, a second run may make a second AI call. Its image is then discarded by the overwrite guard, so the cost is one extra call, never a replaced image.
+- The double-click retry spec runs its requests one after another. Protection against truly simultaneous requests rests on the single compare-and-set `UPDATE`.
 
-- `db/migrate/20261021230001_add_default_to_garment_drafts_attrs.rb` (G6): `garment_drafts.attrs` gets the `{}` default from 5.3. `null: false` is unchanged. Reversible (`change_column_default ... from: nil, to: {}`). `db/schema.rb` changes only the version and that column line.
+**PDF**
+- The inflation budget covers page content streams and form XObjects. Fonts and ToUnicode maps are decoded without a pre-check; they are bounded by the 10 MB file limit and the 5-second timeout.
+- `Timeout` interrupts the request thread at an arbitrary point. That is acceptable because pdf-reader holds no locks or connections, but the block must stay free of database work.
+- A PDF can hold one Puma thread for up to about 5 seconds. Rack::Attack limits receipt uploads per user.
 
-## Config vars and flags
+**Unverified in production**
+- Real Gemini output against the Phase 2 schemas (including `confidence`), Imagen output, SerpAPI response shapes, real image hosts, GCS blob handling, HEIC support on Heroku and dyno memory under real photos have not been tested (section 14).
 
-- None added. Local development and all tests use `AI_ADAPTER=fake` and stubbed HTTP. No real credentials are configured.
+**Demo**
+- The demo images are silhouettes, not photos (section 5).
 
-## Integration tests that need credentials (run before the exit gate)
+## 14. Integration tests that need real credentials
 
-1. SerpAPI with a real `SERPAPI_KEY`: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use, and the thumbnail hosts are covered by the CSP (`*.gstatic.com`, `serpapi.com`).
-2. `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher`.
-3. Vertex `garment_extraction` and `receipt_extraction` with the Phase 2 response schemas against real Gemini (including the optional `confidence` field), on real outfit photos (HEIC from a phone included) and real receipt photos and screenshots; real retailer PDF receipts through `pdf-reader`.
-4. Imagen `garment_image` (garments and drafts), including the content-blocked fallback.
-5. GCS uploads and blob copies on draft commit (`GCS_BUCKET`, service account `storage.objectAdmin`).
-6. Second GCP billing check (design doc 3.4 step 6).
-7. Heroku exit gate: all four intake paths at 390 px, no R14 memory errors.
+**None of these has been run.** Each is still open; no result has been recorded or assumed.
 
-## Still to do from the Phase 1 gap list
+| # | Check | Needs | Status |
+|---|---|---|---|
+| 1 | SerpAPI search: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use, and the thumbnail hosts are covered by the CSP | `SERPAPI_KEY` | Not run |
+| 2 | `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher` (redirects, content types, sizes) | network on Heroku | Not run |
+| 3 | Vertex `garment_extraction` with the 6.6 schema plus `confidence`, on real outfit photos, including HEIC from a phone | Vertex credentials | Not run |
+| 4 | Vertex `receipt_extraction` with the 6.12 schema on receipt photos and screenshots; real retailer PDF receipts through `pdf-reader` | Vertex credentials, sample receipts | Not run |
+| 5 | Imagen `garment_image` for garments and drafts, including the content-blocked fallback | Vertex credentials | Not run |
+| 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | Not run |
+| 7 | Second GCP billing check (3.4 step 6) | GCP console | Not run |
+| 8 | Heroku: all four intake paths at 390 px with real AI, and no R14 memory errors | Heroku app plus 1 to 7 | Not run |
 
+## 15. How to verify
+
+```bash
+bin/setup                                             # or bundle install && bin/rails db:prepare
+bin/rails db:seed                                     # demo@misfit.ai with the 15-item wardrobe (safe to repeat)
+AI_ADAPTER=fake COVERAGE=true bundle exec rspec
+bundle exec cucumber                                  # @wip excluded by the default profile; fake AI is forced
+AI_ADAPTER=fake bundle exec cucumber --no-profile --dry-run --strict --tags @wip features   # finds no @wip scenarios
+bin/rubocop && bin/brakeman --no-pager -q -w2 && bundle exec bundler-audit check --update
+bin/rails zeitwerk:check
+```
+
+By hand, with `bin/dev`:
+1. Sign in as `demo@misfit.ai` and open `/wardrobe`. You should see 15 cards with images and working category pills.
+2. Add a garment by hand with "Generate a product image" checked. The fake image should appear without a reload.
+3. Hide and delete a garment.
+4. Paste the receipt text from `spec/requests/wardrobe/receipts_spec.rb`, review it and choose "Add selected".
+5. Upload `spec/fixtures/files/outfit.jpg` under Photo AI.
+
+Search needs `SERPAPI_KEY`; without it, it shows "Garment search is not configured".
+
+## 16. Local verification results (2026-10-21, fake AI, stubbed HTTP)
+
+| Check | Result |
+|---|---|
+| RSpec | 618 examples, 0 failures. SimpleCov `app/services`: 95.09% (891 / 937 lines; minimum 85) |
+| Cucumber | 74 scenarios (74 passed), 436 steps (436 passed), including the 8 `@javascript` (Cuprite) scenarios. The `@wip` dry run matches 0 scenarios |
+| `@wip` scenarios | none (`grep -rn @wip features/` finds no tags) |
+| RuboCop | 228 files inspected, no offenses |
+| Brakeman (`-w2`) | No warnings (exit 0) |
+| bundler-audit | No vulnerabilities found (advisory database updated before the check) |
+| `bin/rails zeitwerk:check` | All is good |
+| `bin/rails db:seed`, run twice on development | 15 garments, all carrying the `demo-seed:` marker, 15 attached images and 15 blobs after both runs. The password is not printed |
+| Demo wardrobe at 1280 px (desktop) | 15 cards render with images; grid correct; `scrollWidth` 1280, so no horizontal overflow |
+| Demo wardrobe at 390 px (mobile) | 15 cards render with images; grid correct; `scrollWidth` 390, so no horizontal overflow |
+
+The screenshots were taken with Cuprite against the local test server. That is not a check on Heroku: exit-gate item 3 still needs a check by hand at 390 px on Heroku with real AI.
+
+## 17. Exit gate (10.4)
+
+| # | Item | Status | Evidence / what is missing |
+|---|---|---|---|
+| 1 | Every scenario and spec of Phases 1 and 2 passes in CI on `main`; none `@wip` | **BLOCKED** | Everything passes locally and no `@wip` scenarios remain (section 16). The PR is not open and nothing is merged, so there is no CI run on `main`. |
+| 2 | Brakeman and bundler-audit report no new warnings; RuboCop clean; SimpleCov at 85% or above for `app/services` | **PASS** (locally) | Section 16. The only Brakeman suppression is the documented Rails EOL entry from Step 1. |
+| 3 | `main` deployed to Heroku, `/up` green, features work there with real AI, checked by hand at 390 px | **BLOCKED** | No deploy, no credentials. Verified only locally with the fake adapter. |
+| 4 | `bin/ai_smoke` passes on Heroku | **BLOCKED** | Not run (section 19). |
+| 5 | AI spend checked in `/admin/ai_usage` and GCP Billing; both numbers in this note | **BLOCKED** | Not checked (section 18). |
+| 6 | Every Phase 2 contract exists with its documented signature and RSpec coverage | **PASS** | Section 3. |
+| 7 | Every forward slot this phase leaves is in place, with its flag in the default state | **PASS** | Phase 2 leaves no new slots; `photo_intake` and `receipts` are on by default and Phase 1's slots are unchanged (section 11). |
+| 8 | `docs/handoff/phase-2.md` merged and tag `phase-2-complete` pushed | **BLOCKED** | Held back on purpose until review, the PR and items 1 and 3 to 5. |
+| 11.2 | All four intake paths work on Heroku | **BLOCKED** | Needs items 3 and 14.8. |
+| 11.2 | `filter_and_rank_spec` and `text_parser_spec` green | **PASS** | Part of the RSpec run. |
+| 3.4 | Second GCP billing check at Phase 2 entry | **BLOCKED** | Needs GCP console access (section 14, item 7). |
+
+**Phase 2 is not complete.** It is ready for final integration testing once credentials and the Heroku app are available.
+
+## 18. AI spend
+
+- `/admin/ai_usage` today: **not checked (BLOCKED)**: no production deploy.
+- GCP billing to date: **not checked (BLOCKED)**.
+- Credits applied: **unknown (BLOCKED)**.
+
+Locally, every AI call went through the fake adapter, so no spend came from Phase 2 development.
+
+## 19. bin/ai_smoke output
+
+Not run: it needs Heroku and real Vertex credentials (BLOCKED). Paste the output here at the exit gate.
+
+## 20. Questions for the next phase
+
+- **Phase 3:**
+  - Render garments with `garments/_thumb` (size the wrapping element).
+  - Hide garments through `Wardrobe::SetHidden`.
+  - Read wardrobes through `user.garments.visible`.
+  - Keep streams user-first (`[user, :planner]`), or the cable authorization refuses the subscription.
+- **Phase 3:** the demo user has no profile or measurements yet (section 8). The engine and the demo week seed need them.
+- **Phase 4:**
+  - `Wardrobe::StarterImport` saves all rows in one transaction and raises on the first invalid one, so validate onboarding rows before calling.
+  - The deferred stretch items are in section 4.
+- **Dev 1:** the Rails upgrade before 2026-11-07, and the other items in section 8.
+- **Team:** SerpAPI's free plan is 250 searches a month, and Rack::Attack allows up to 60 per user per hour. Watch usage during the demo.
 
 ## Working agreements for Phase 2 tests
 
 - `@javascript` scenarios wait on conditions (Capybara's waiting finders and matchers such as `have_content`, `have_css`, `have_no_css`), never fixed `sleep`s.
-
-## How to verify
-
-```bash
-AI_ADAPTER=fake COVERAGE=true bundle exec rspec
-bundle exec cucumber                                  # @wip excluded by the default profile; fake AI is forced
-AI_ADAPTER=fake bundle exec cucumber --no-profile --dry-run --strict --tags @wip features   # all Phase 2 steps defined, none ambiguous
-bin/rubocop && bin/brakeman --no-pager -q -w2 && bundle exec bundler-audit check --update
-```
+- Tests make no real network or DNS calls: WebMock, `FakeDns`, and a browser limited to the test server.
+- The fake AI adapter is forced in Cucumber.
