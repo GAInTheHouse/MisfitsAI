@@ -537,14 +537,14 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 
 ## 14. Integration tests that need real credentials
 
-Checks 1, 2 and 3 have been run, locally (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
+Checks 1, 2, 3 and 4 have been run, locally (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
 
 | # | Check | Needs | Status |
 |---|---|---|---|
 | 1 | SerpAPI search: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use, and the thumbnail hosts are covered by the CSP | `SERPAPI_KEY` | **Passed locally** (2026-10-21, one request); page-2 backfill not triggered |
 | 2 | `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher` (redirects, content types, sizes) | network | **Passed locally** (2026-10-21, one download); Active Storage on local disk, so GCS is untested (check 6) |
 | 3 | Vertex `garment_extraction` with the 6.6 schema plus `confidence`, on real outfit photos, including HEIC from a phone | Vertex credentials | **Passed locally** (2026-10-22, one real product photo, local ADC); HEIC from a phone and further photos not yet tested |
-| 4 | Vertex `receipt_extraction` with the 6.12 schema on receipt photos and screenshots; real retailer PDF receipts through `pdf-reader` | Vertex credentials, sample receipts | Not run |
+| 4 | Vertex `receipt_extraction` with the 6.12 schema on receipt photos and screenshots; real retailer PDF receipts through `pdf-reader` | Vertex credentials, sample receipts | **Passed locally** (2026-10-22, one synthetic receipt image, local ADC); real receipt photos and retailer PDFs not yet tested |
 | 5 | Imagen `garment_image` for garments and drafts, including the content-blocked fallback | Vertex credentials | Not run |
 | 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | Not run |
 | 7 | Second GCP billing check (3.4 step 6) | GCP console | Not run |
@@ -655,6 +655,59 @@ There was no job and no retry. In-process instrumentation capped the run at one 
 1. Gemini receipt extraction (check 4).
 2. Imagen image generation (check 5).
 3. Google Cloud Storage (check 6).
+
+### Check 4: real Gemini receipt extraction (PASSED, local, 2026-10-22)
+
+**Environment**
+- Google Cloud project `misfitai-512403`; model `gemini-2.5-flash`; region `us-central1`.
+- Authentication: local Application Default Credentials (`GOOGLE_SERVICE_ACCOUNT_JSON` blank).
+- `AI_ADAPTER=vertex` and `GOOGLE_CLOUD_PROJECT=misfitai-512403` were set only in the environment of the one test process (`bin/rails runner`). `.env` is unchanged, with `AI_ADAPTER=fake`.
+
+**Test input**
+- A synthetic receipt rendered locally with libvips, from the fictional retailer SAMPLE OUTFITTERS: 1183×1621 JPEG, monospace print on off-white paper, rotated −2°, slight grain, on a neutral grey background.
+- It lists five clothing and accessory products, plus a gift card, gift wrap, a member discount, subtotal, tax, total and a payment line (`VISA ************0000`, `AUTH: 000000`). The totals add up: $428.40 − $10.00 + $37.13 tax = $455.53.
+- No personal information and no external image download. The image was deleted after the test.
+
+**Execution**
+- The app's own path: `Wardrobe::PhotoIntake::ImagePreparer` (`max_side: Receipts::ParseImageJob::MAX_SIDE`, 2400), then `Receipts::VisionParser.call`, with the real `Receipts::Prompts::VISION` and `RECEIPT_SCHEMA`.
+- There was no job and no retry. In-process instrumentation capped the run at one request and printed nothing that contained the token, the request body or the image data.
+- Exactly one Gemini generation request: HTTP 200, about 3,127 ms (`ai_calls.latency_ms` 3,128), `finishReason: STOP`, 1,918 input and 285 output tokens.
+
+**Extraction results**
+- The raw response passed `RECEIPT_SCHEMA`.
+- All five expected products were identified, and all 30 attribute checks passed (category, brand, size, colour and price for each).
+- No product was missed. No non-clothing line was included: the gift card, gift wrap, discount, subtotal, tax, total and payment lines were all excluded.
+- Gemini returned a confidence for every item, from 0.90 to 0.95, so `VisionParser.normalize` did not have to compute any. None is flagged "Please double-check".
+
+| Product | Category | Brand | Size | Colour | Price | Confidence |
+|---|---|---|---|---|---|---|
+| Levi's 501 Original Jeans | bottom | Levi's | W32 L30 | Dark Wash | $69.50 | 0.95 |
+| Uniqlo Merino Crew Neck Sweater | top | Uniqlo | M | Navy | $39.90 | 0.95 |
+| Nike Air Force 1 '07 Sneakers | shoes | Nike | 10 | White | $115.00 | 0.95 |
+| Patagonia Better Sweater Jacket | outerwear | Patagonia | L | Grey | $139.00 | 0.95 |
+| Leather Belt | accessory | none | 34 | Brown | $35.00 | 0.90 |
+
+**Draft validation**
+- `Receipts::Intake.draft_attrs` gave the correct attributes for every item, with prices in cents (6950, 3990, 11500, 13900, 3500) and lowercased colours.
+- `Receipts::Intake.finish` was run with a throwaway user and batch inside a database transaction that was always rolled back. Before running it, the code was checked for anything that could outlast a rollback: it only writes rows, with no jobs, broadcasts, attachments or external calls, and the models have no `after_commit` callbacks.
+  - It created five drafts that were `ready`, selected and committable, and the batch reached `ready` at 100%.
+  - No background jobs were queued (`solid_queue_jobs` stayed at 0).
+  - After the rollback, none of the temporary records existed (checked by ID), and the counts of users, profiles, batches, drafts, garments and blobs were unchanged.
+
+**Usage**
+- One `ai_calls` row is kept: `kind receipt_extraction`, `status ok`, `images_in 1`, `est_cost_cents 0.5`, no user.
+- 0.5¢ is our internal estimate; Google Cloud Billing is authoritative.
+
+**Follow-up observations** (not reasons to mark the test failed)
+- **Colour normalization:** Gemini reported the jeans' colour as "Dark Wash", stored as `color_primary: "dark wash"` rather than a standard colour such as "blue". Colour matching in later phases may not recognise it.
+- **Size normalization:** Gemini kept "W32 L30", while the rule-based `TextParser` produces "W32L30", so the two receipt paths store sizes in different formats.
+- **Synthetic receipt limits:** blur, glare, faded thermal print, crumpled paper and long receipts from real-world use remain untested.
+- **`input_chars`** includes the base64 image data (362,876 for this call), as in check 3.
+- **Not exercised:** the full browser flow (upload, `Receipts::ParseImageJob`, review, commit), and the job's deletion of the uploaded receipt after reading it.
+
+**Next checks**
+1. Check 5: real Imagen garment image generation.
+2. Check 6: Google Cloud Storage integration.
 
 ## 15. How to verify
 
