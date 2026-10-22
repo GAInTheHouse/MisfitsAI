@@ -132,8 +132,8 @@ Then("the garment {string} should have these details:") do |name, table|
   expect(expected.to_h { |column, _| [ column, garment.public_send(column).to_s ] }).to eq(expected)
 end
 
-Then("the garment {string} should have the fit note {string}") do |_name, _note|
-  pending "Phase 2 Step 8"
+Then("the garment {string} should have the fit note {string}") do |name, note|
+  expect(Garment.find_by!(user_id: @user.id, name: name).fit_notes).to eq(note)
 end
 
 Then("no AI image generation should have been requested") do

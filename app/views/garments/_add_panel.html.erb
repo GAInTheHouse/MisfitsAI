@@ -26,7 +26,10 @@
           <%= render "shared/spinner", message: "Loading…" %>
         <% end %>
       <% when "receipt" %>
-        <%= render "shared/empty_state", title: "Receipt", message: "Coming soon" %>
+        <%# Loaded when the tab is opened (design doc 6.4, Phase 2 brief: lazy frame "receipt_intake"). %>
+        <%= turbo_frame_tag "receipt_intake", src: new_wardrobe_receipt_path, loading: :lazy do %>
+          <%= render "shared/spinner", message: "Loading…" %>
+        <% end %>
       <% when "describe" %>
         <div data-controller="shared--tabs">
           <div role="tablist" aria-label="Describe an item" class="flex gap-2 mb-4">

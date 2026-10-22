@@ -5,9 +5,12 @@ module Wardrobe
   # to six drafts and queues their product images. The batch always ends ready or failed, and the source
   # photo is deleted once it has (only the generated images are kept).
   class ExtractGarmentsJob < ApplicationJob
+    include IntakeBatchJobSupport
+
     queue_as :ai_text
 
     ANALYZE_FAILED = "We couldn't analyze that photo right now. Please try again."
+    PROCESSING_FAILED = ANALYZE_FAILED # used by IntakeBatchJobSupport's catch-all
     NO_GARMENTS = "No garments detected from image. Please upload a clearer outfit photo."
     QUOTA_REACHED = "You've reached today's photo analysis limit. Please try again tomorrow."
     UNREADABLE = "We couldn't read that photo. Please upload a JPEG, PNG, WebP or HEIC image."
@@ -15,14 +18,7 @@ module Wardrobe
     STARTED_PROGRESS = 10
     DRAFTS_READY_PROGRESS = 30
 
-    # Handlers declared later win, so the catch-all comes first.
-    rescue_from(StandardError) do |error|
-      # The batch was discarded or purged while this job ran: nothing left to report, nothing to recreate.
-      next unless IntakeBatch.exists?(arguments.first)
-
-      fail_batch(ANALYZE_FAILED)
-      raise error
-    end
+    # The catch-all (fail and re-raise) comes from IntakeBatchJobSupport; these specific handlers win over it.
     rescue_from(Ai::ContentBlockedError, Ai::DisabledError, PhotoIntake::MalformedResponseError) do |error|
       Rails.logger.info("[Wardrobe::ExtractGarmentsJob] batch #{arguments.first}: #{error.class}")
       fail_batch(ANALYZE_FAILED)
@@ -52,7 +48,7 @@ module Wardrobe
       drafts = create_drafts(items)
       @batch.update!(status: "ready", progress: DRAFTS_READY_PROGRESS, error: nil)
       purge_source
-      broadcast
+      broadcast_batch
       ActiveRecord.after_all_transactions_commit do
         ActiveJob.perform_all_later(drafts.map { Wardrobe::GenerateDraftImageJob.new(_1.id) })
       end
@@ -68,24 +64,6 @@ module Wardrobe
       end
     end
 
-    def fail_batch(message)
-      batch = @batch || IntakeBatch.find_by(id: arguments.first)
-      return unless batch
-
-      @batch = batch
-      batch.mark_failed!(message)
-      purge_source
-      broadcast
-    end
-
-    def purge_source
-      @batch.source_file.purge_later if @batch.source_file.attached?
-    end
-
-    def broadcast
-      Turbo::StreamsChannel.broadcast_replace_to(
-        [ @batch.user, :wardrobe ], target: @batch, partial: "wardrobe/photo_intakes/batch", locals: { batch: @batch.reload }
-      )
-    end
+    def batch_partial = "wardrobe/photo_intakes/batch"
   end
 end

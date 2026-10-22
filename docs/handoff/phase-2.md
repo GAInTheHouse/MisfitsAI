@@ -14,7 +14,8 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 | 4. Wardrobe UI and manual garment management | Done (approved) |
 | 5. AI image generation and bulk garment creation | Done (approved) |
 | 6. Garment image search and remote image import | Done (approved) |
-| 7. AI photo intake | In review |
+| 7. AI photo intake | Done (approved) |
+| 8. Receipt parsing and intake | In review |
 
 ## Shipped
 
@@ -73,7 +74,17 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
   - Specs: mapper, prompts (compared to the doc text), image preparer, both jobs, purge job, request spec `spec/requests/wardrobe/photo_intakes_spec.rb`, authorization cases.
   - Activated all 10 `photo_intake.feature` scenarios and added "Photo intake from the wardrobe's Photo AI tab" (`@javascript`).
 
+- Receipts (Step 8):
+  - `Wardrobe::ReceiptsController` (`new`, `create`, `show`; behind `Feature.enabled?(:receipts)`), in the lazily loaded `receipt_intake` frame of the Receipt tab or on its own page. Input routed by content: pasted text (`text_rules`), a PDF (`pdf_text_rules`) or a UTF-8 text file (`plain_text_rules`) are parsed in the request and never stored as files; a receipt image (`image_vision`) is stored and read by `Receipts::ParseImageJob`.
+  - `Receipts::TextParser` (exact 6.12 port), `Receipts::PdfText` (first 20 pages), `Receipts::VisionParser` (exact 6.12 prompt and schema through `Ai::Client`, 6.12 normalization), `Receipts::Intake` (batch + drafts with the 6.12 attrs), `Receipts::Commit` (edits, price parsing, `Wardrobe::AddGarments` with `source: :receipt`, price note, product images on request).
+  - Review: one editable card per item (Include, name, brand, size, color, category, price), "Please double-check" on low confidence, extracted text (collapsible), "Generate product images" (checked), Select all / Select none, "Add selected", "Discard", failed state with "Try again".
+  - Reused from photo intake: `IntakeBatch`/`GarmentDraft`, `IntakeBatchesController#commit`/`destroy` (now branching on kind), `Wardrobe::DraftEdits` (shared edit step, photo commit refactored onto it), `IntakeBatchJobSupport` (shared failure/purge/broadcast for intake jobs, `ExtractGarmentsJob` refactored onto it), `ImagePreparer` (with `max_side:`), the `wardrobe--draft-selection` Stimulus controller.
+  - Specs: text parser, PDF text, vision parser, commit, image job, request spec `spec/requests/wardrobe/receipts_spec.rb`, authorization cases.
+  - Activated all 8 `receipts.feature` scenarios still `@wip` and added "Add receipt items from the wardrobe's Receipt tab" (`@javascript`). No `@wip` scenarios remain in Phase 2.
+
 ## Not done / deferred
+
+- Receipt LLM cleanup (`RECEIPT_LLM_CLEANUP`, 6.12 optional stretch): not built; for Phase 4's stretch list.
 
 - Photo intake click-to-zoom `<dialog>` (6.6, "may defer" in 11.2): not built; for Phase 4's stretch list.
 
@@ -116,12 +127,13 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 - [DEVIATION] 10.7: Phase 2 is one PR with logical commits on `phase-2`, not one PR per `p2/<topic>` branch. This follows the Phase 1 approach, at the team's request. Step 1 was written on `p2/acceptance-specs` and fast-forwarded into `phase-2`.
 - [DEVIATION] 10.7: Step 1 also carries the two CI-maintenance changes above, so CI stays green for the rest of Phase 2.
 
+- [DEVIATION] 8.4: `spec/services/receipts/text_parser_spec.rb` inputs are written from the 6.12 algorithm, because the original `receipt_parser.py` tests are not available. They pin the documented behaviour, including the original's quirks (below).
+- [DEVIATION] 6.12: the receipt review is a list of editable cards instead of a table, so it works at 390 px; the fields are the ones 6.12 lists.
 - [DEVIATION] 6.4: the six placeholder images are new flat silhouettes (`--line-strong` on `--bg`), drawn with libvips by `script/generate_placeholder_images.rb`, because `misfitai-mobile/assets/stock/` is not available. The doc maps four stock photos onto six categories; there is now one image per category. They make no claim to match the original photos.
 
 Planned, not yet made (to be confirmed in their steps):
 
 - [DEVIATION] 6.5: `STOPWORDS`, `NEGATIVE_WORDS`, `APPAREL_HINTS` and `GARMENT_NOUNS` (`app/services/wardrobe/search/word_lists.rb`) are rebuilt from the role 6.5 gives each list, because `backend/garment_search_filter.py` is not available. They make no claim to match the original lists; `filter_and_rank_spec` pins the algorithm with cases whose outcome follows from the doc.
-- [DEVIATION] 8.4: `text_parser_spec` inputs will be written from the 6.12 algorithm, because the original `receipt_parser.py` tests are not available.
 
 ## Decisions made where the doc was silent
 
@@ -178,6 +190,16 @@ Planned, not yet made (to be confirmed in their steps):
 - [DECISION] Draft image broadcasts replace only the image area and the progress bar, never the inputs, so edits made while images arrive are kept.
 - [DECISION] `turbo_stream_from` sits inside the `photo_intake` frame: when the frame navigates, Turbo keeps only the frame's contents, so a subscription outside it would be lost on the standalone page (found by the browser test).
 - [DECISION] `IntakeBatchesController#commit` handles photo batches only until Step 8 adds receipts.
+- [DECISION] Receipt input limits: 10 MB per file (6.12); pasted text up to 20,000 characters; PDF text from the first 20 pages (6.12) and at most 50,000 characters; a text file is read up to 20,000 characters. The kind of file is decided from its bytes, never its name or Content-Type.
+- [DECISION] A receipt with no items found ends as a failed batch ("We couldn't find any clothing items on that receipt.") with "Try again". The receipt image job uses its own quota and unreadable messages, and prepares images at up to 2400 px (photos: 1600) so small print stays legible.
+- [DECISION] Edited receipt prices accept "39.90", "$39.90" or "39,90"; anything else shows "Price must be a number like 39.90" and saves nothing. A blank price means unknown (no price note).
+- [DEVIATION] 6.12 `Receipts::TextParser` fixes three bugs of the original (approved). Specs pin each:
+  - Sizes are looked for after removing prices, SKUs and the leading quantity. The original ran `SIZE_RE` over the whole line, so a price gave a size from its digits ("$39.90" -> "39", "$120.00" -> "00"). Real sizes (M, XL, 10, 32, 38, 9.5, W32L30) are still found.
+  - `NON_ITEM_TERMS` match whole words, with an optional plural ("cards", "taxes", "thanks"). The original matched substrings, so "card" excluded every "Cardigan" line.
+  - A priced line that names no garment (e.g. "Coffee 3.50") is still returned, but with `category_found: false`, always flagged, and its draft starts unselected, so "Add selected" does not add it unless the user ticks it. The original made it a selected row like any garment.
+  - Names lose hyphens left at their ends by the removals ("SKU: AB-12" used to leave "Linen Shirt -").
+  - Kept as in 6.12: the fallback hint is a whole word ("trouser" misses "trousers") and its 24-character snippet can merge nearby words.
+- [DECISION] PDF parsing stays in the request (6.12) with four bounds: 10 MB file (checked before reading), first 20 pages, 50,000 characters, and two resource guards in `Receipts::PdfText`: (1) before a page's text is extracted, its content streams and form XObjects are inflated in 4 KB chunks against a shared 20 MB budget, so a compression bomb is refused before pdf-reader inflates it whole; (2) the whole read is limited to 5 seconds (`Timeout`; pdf-reader is pure Ruby, so it can be interrupted, and Ruby 3.3's timeout cannot be swallowed by a `rescue StandardError` inside the gem). Both end in "That PDF is too large or complex to read. Try pasting the receipt text instead."
 - [DECISION] Extra scenarios beyond the 12.1 minimum: a category is required, an 80-character name limit, the image kill switch and the blocked-image fallback, a private-address image is never fetched (4.4), the 6-draft cap, draft image failure, discard, the source photo is purged, and the feature flags hide the Photo AI and Receipt tabs.
 
 ## Known issues (Phase 1, to file; not blocking Phase 2)
@@ -202,6 +224,12 @@ Planned, not yet made (to be confirmed in their steps):
 
 - G9 (Step 0) was a false alarm: libvips is loaded at boot (through `image_processing`), so `config/initializers/vips.rb` does apply `cache_set_max(0)` and `concurrency_set(1)` (checked in production and test).
 
+## PDF limitations for deployment
+
+- The inflation budget covers page content streams and form XObjects, the streams text extraction decodes most. Fonts and their ToUnicode maps are decoded by pdf-reader without a pre-check; they are bounded by the 10 MB file limit and the 5-second timeout.
+- `Timeout` interrupts the request thread at an arbitrary point. That is acceptable here (pdf-reader works on an in-memory copy and holds no locks or connections), but the block must stay free of database work.
+- A PDF still costs up to ~5 seconds of one Puma thread; Rack::Attack limits receipt uploads per user.
+
 ## Rate limits still to do
 
 - G10: the hourly per-user limit for AI POSTs (4.4: 60 per hour) is not added yet; planned for the hardening step.
@@ -218,7 +246,7 @@ Planned, not yet made (to be confirmed in their steps):
 
 1. SerpAPI with a real `SERPAPI_KEY`: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use, and the thumbnail hosts are covered by the CSP (`*.gstatic.com`, `serpapi.com`).
 2. `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher`.
-3. Vertex `garment_extraction` and `receipt_extraction` with the Phase 2 response schemas against real Gemini (including the optional `confidence` field), on real outfit photos (HEIC from a phone included).
+3. Vertex `garment_extraction` and `receipt_extraction` with the Phase 2 response schemas against real Gemini (including the optional `confidence` field), on real outfit photos (HEIC from a phone included) and real receipt photos and screenshots; real retailer PDF receipts through `pdf-reader`.
 4. Imagen `garment_image` (garments and drafts), including the content-blocked fallback.
 5. GCS uploads and blob copies on draft commit (`GCS_BUCKET`, service account `storage.objectAdmin`).
 6. Second GCP billing check (design doc 3.4 step 6).

@@ -16,7 +16,7 @@ module Wardrobe
     #   AI call serves both. A delayed GenerateGarmentImageJob is the safety net if that job never delivers
     #   (failure, crash, purge): it finds the garment ready and stops, or makes the image itself.
     class Commit
-      EDITABLE = %w[selected name category].freeze
+      EDITABLE = %w[name category].freeze
       SAFETY_NET_DELAY = 10.minutes # matches the image jobs' concurrency window
 
       def self.call(batch:, edits: {})
@@ -32,7 +32,7 @@ module Wardrobe
         garments = []
         needs_image = []
         @batch.with_lock do
-          apply_edits
+          Wardrobe::DraftEdits.apply(batch: @batch, edits: @edits, fields: EDITABLE)
           @batch.garment_drafts.committable.ordered.lock.each do |draft|
             garment = Garment.create!(draft.garment_attributes.merge(user: @batch.user, source: "photo",
                                                                      image_status: image_status_for(draft)))
@@ -53,17 +53,6 @@ module Wardrobe
       end
 
       private
-
-      def apply_edits
-        @batch.garment_drafts.where(id: @edits.keys).find_each do |draft|
-          next unless GarmentDraft::COMMITTABLE_STATUSES.include?(draft.status)
-
-          edit = @edits[draft.id].to_h.stringify_keys.slice(*EDITABLE)
-          attrs = draft.attrs.merge(edit.slice("name", "category").transform_values { _1.to_s.squish })
-          selected = edit.key?("selected") ? ActiveModel::Type::Boolean.new.cast(edit["selected"]) : draft.selected
-          draft.update!(attrs: attrs, selected: selected)
-        end
-      end
 
       def image_status_for(draft)
         return "ready" if draft.image.attached?

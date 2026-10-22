@@ -53,4 +53,29 @@ RSpec.describe "Authorization", type: :request do
       expect(batch.reload.garment_drafts.first.name).not_to eq("Hijacked")
     end
   end
+
+  describe "receipts (Phase 2)" do
+    let(:receipt) { create(:intake_batch, :receipt, user: user_a, status: "ready") }
+    let!(:row) { create(:garment_draft, :ready, intake_batch: receipt) }
+
+    it "returns 404 for another user's receipt, its commit and discard" do
+      get wardrobe_receipt_path(receipt)
+      expect(response).to have_http_status(:not_found)
+      post commit_wardrobe_intake_batch_path(receipt)
+      expect(response).to have_http_status(:not_found)
+      delete wardrobe_intake_batch_path(receipt)
+      expect(response).to have_http_status(:not_found)
+      expect(user_b.garments).to be_empty
+      expect(IntakeBatch.exists?(receipt.id)).to be(true)
+    end
+
+    it "cannot open a photo batch through the receipt page, or a receipt through the photo page" do
+      photo = create(:intake_batch, user: user_b, status: "ready")
+      own_receipt = create(:intake_batch, :receipt, user: user_b, status: "ready")
+      get wardrobe_receipt_path(photo)
+      expect(response).to have_http_status(:not_found)
+      get wardrobe_photo_intake_path(own_receipt)
+      expect(response).to have_http_status(:not_found)
+    end
+  end
 end

@@ -52,6 +52,25 @@ module WardrobeHelpers
     expect(page).to have_css("[id^='intake_batch_'], #photo_intake_form [role=alert]")
   end
 
+  # CSS for the receipt review row of the item with this exact name (wardrobe/receipts/_row sets data-name).
+  def receipt_row_css(name)
+    %(article.receipt-row[data-name="#{css_string(name)}"])
+  end
+
+  # Fills the receipt form (in the yielded block) on the Receipt tab if it is on screen, else on the receipt
+  # page, submits it, and waits for the result (rows, the reading card or an error).
+  def submit_receipt
+    if page.has_css?("[role=tab]", exact_text: "Receipt", visible: true, wait: 0)
+      find("[role=tab]", exact_text: "Receipt").click
+    end
+    visit new_wardrobe_receipt_path unless page.has_css?("#receipt_intake_form", visible: true, wait: 2)
+    within("#receipt_intake_form") do
+      yield
+      click_button "Read receipt"
+    end
+    expect(page).to have_css("[id^='intake_batch_'], #receipt_intake_form [role=alert]")
+  end
+
   private
 
   def css_string(value)
