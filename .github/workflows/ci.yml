@@ -9,7 +9,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.12
@@ -38,7 +38,7 @@ jobs:
       AI_ADAPTER: fake
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/misfit_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.12
@@ -76,7 +76,7 @@ jobs:
       # snapshot in the tool cache, which did not start on Ubuntu 24.04 (Ferrum::ProcessTimeoutError).
       BROWSER_PATH: /usr/bin/google-chrome-stable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.12
