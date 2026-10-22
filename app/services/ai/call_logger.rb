@@ -4,9 +4,11 @@ module Ai
   class CallLogger
     PRICING = YAML.load_file(Rails.root.join("config/ai_pricing.yml"))["default"].freeze
 
+    # billable: false (failed attempts) records 0 estimated cents. That is our estimate only: the provider may
+    # still charge for some failed calls, and GCP Billing stays the source of truth.
     def self.log(kind:, model:, status:, latency_ms:, user: nil, input_chars: 0, output_chars: 0,
-                 images_in: 0, images_out: 0, error_class: nil)
-      est = PRICING[kind.to_s].to_f
+                 images_in: 0, images_out: 0, error_class: nil, billable: true)
+      est = billable ? PRICING[kind.to_s].to_f : 0
       AiCall.create!(
         user: user,
         kind: kind.to_s,

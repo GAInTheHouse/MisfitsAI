@@ -1,0 +1,20 @@
+<%# locals: (user:) %>
+<% count = user.garments.count %>
+<%# Visible garments only, the same rule as the planner's generate guard (design doc 6.7). %>
+<% ready = user.garments.visible.outfit_ready? %>
+<section id="wardrobe_status" class="space-y-3">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="font-display text-3xl">Wardrobe</h1>
+      <p id="wardrobe_count" class="text-sm text-[var(--muted)]"><%= pluralize(count, "item") %></p>
+    </div>
+    <% if ready %>
+      <%= link_to "Next: plan your week", week_plan_path, class: "btn-primary" %>
+    <% end %>
+  </div>
+  <% unless ready %>
+    <p id="planning_hint" class="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style="background: var(--panel); border-color: var(--line);">
+      Add at least one top and one bottom to unlock outfit planning.
+    </p>
+  <% end %>
+</section>

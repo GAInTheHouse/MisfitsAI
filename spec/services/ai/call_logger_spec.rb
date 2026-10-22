@@ -18,4 +18,11 @@ RSpec.describe Ai::CallLogger do
     )
     expect(AiCall.last.user_id).to eq(user.id)
   end
+
+  it "records the kind's estimated cost by default and zero for a non-billable (failed) attempt" do
+    described_class.log(kind: :garment_image, model: "m", status: "ok", latency_ms: 1)
+    described_class.log(kind: :garment_image, model: "m", status: "error", latency_ms: 1, billable: false,
+                        error_class: "Ai::TransientError")
+    expect(AiCall.order(:created_at).pluck(:status, :est_cost_cents)).to eq([ [ "ok", described_class::PRICING["garment_image"] ], [ "error", 0 ] ])
+  end
 end

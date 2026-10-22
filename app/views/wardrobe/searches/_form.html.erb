@@ -1,0 +1,65 @@
+<%# locals: (search: {}) %>
+<%# Design doc 6.5 search form. Results load into the garment_search_results frame next to it. %>
+<div id="garment_search_form">
+  <%= form_with scope: :search, url: wardrobe_searches_path, class: "space-y-4",
+                data: { turbo_frame: "garment_search_results" } do |f| %>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="space-y-1">
+        <%= f.label :brand, class: "text-sm font-medium" %>
+        <%= f.text_field :brand, value: search[:brand], list: "search_brand_options", class: "input", autocomplete: "off" %>
+        <datalist id="search_brand_options">
+          <% Options.fetch(:search_brands).each do |brand| %>
+            <option value="<%= brand %>"></option>
+          <% end %>
+        </datalist>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :keywords, class: "text-sm font-medium" %>
+        <%= f.text_field :keywords, value: search[:keywords], class: "input", placeholder: "e.g. white oxford shirt" %>
+      </div>
+    </div>
+    <p class="text-xs text-[var(--muted)]">Enter a brand, keywords, or both.</p>
+
+    <fieldset class="space-y-2">
+      <legend class="text-sm font-medium">Category</legend>
+      <%= render "shared/pill_group", name: "search[category]", options: garment_category_options,
+                                      selected: search[:category], multiple: false %>
+    </fieldset>
+
+    <div class="grid gap-4 sm:grid-cols-3">
+      <div class="space-y-1">
+        <%= f.label :kind, class: "text-sm font-medium" %>
+        <%= f.select :kind, grouped_options_for_select(search_kind_options, search[:kind]),
+                     { include_blank: "Any kind" }, class: "input" %>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :color, class: "text-sm font-medium" %>
+        <%= f.select :color, options_for_select(Options.fetch(:search_colors), search[:color]),
+                     { include_blank: "Any color" }, class: "input" %>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :material, class: "text-sm font-medium" %>
+        <%= f.select :material, options_for_select(Options.fetch(:search_materials), search[:material]),
+                     { include_blank: "Any material" }, class: "input" %>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :formality, class: "text-sm font-medium" %>
+        <%= f.select :formality, options_for_select(garment_select_options(:formality), search[:formality] || "casual"),
+                     {}, class: "input" %>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :seasonality, "Season", class: "text-sm font-medium" %>
+        <%= f.select :seasonality, options_for_select(garment_select_options(:seasonality), search[:seasonality] || "all_season"),
+                     {}, class: "input" %>
+      </div>
+    </div>
+
+    <fieldset class="space-y-2">
+      <legend class="text-sm font-medium">Gender</legend>
+      <%= render "shared/pill_group", name: "search[gender]", options: [ [ "", "Any" ], [ "men", "Men" ], [ "women", "Women" ] ],
+                                      selected: search[:gender].to_s, multiple: false %>
+    </fieldset>
+
+    <%= f.submit "Search", class: "btn-primary" %>
+  <% end %>
+</div>

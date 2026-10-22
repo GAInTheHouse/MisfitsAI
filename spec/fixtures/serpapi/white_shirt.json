@@ -1,0 +1,12 @@
+{
+  "search_metadata": { "status": "Success" },
+  "images_results": [
+    { "position": 1, "title": "Uniqlo Men's Oxford Shirt - White", "link": "https://www.uniqlo.com/us/en/products/oxford-shirt", "original": "https://image.uniqlo.com/oxford-white.jpg", "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:oxford" },
+    { "position": 2, "title": "Model wearing a white shirt, street style", "link": "https://fashionblog.example.com/street-style", "original": "https://fashionblog.example.com/look.jpg", "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:look" },
+    { "position": 3, "title": "White Laptop Stand", "link": "https://desk.example.com/stand", "original": "https://desk.example.com/stand.jpg", "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:stand" },
+    { "position": 4, "title": "Uniqlo Linen Blend Shirt White, regular fit cotton", "link": "https://www.uniqlo.com/us/en/products/linen-shirt", "original": "https://image.uniqlo.com/linen-white.jpg", "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:linen" },
+    { "position": 5, "title": "Uniqlo Men's Oxford Shirt - White (duplicate)", "link": "https://shop.example.com/dup", "original": "https://image.uniqlo.com/oxford-white.jpg", "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:dup" },
+    { "position": 6, "title": "Inline preview", "link": "https://shop.example.com/inline", "original": "data:image/jpeg;base64,AAAA", "thumbnail": "data:image/jpeg;base64,AAAA" },
+    { "position": 7, "title": "No image at all", "link": "https://shop.example.com/none" }
+  ]
+}

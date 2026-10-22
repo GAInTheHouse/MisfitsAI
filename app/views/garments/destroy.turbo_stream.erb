@@ -1,0 +1,6 @@
+<%= turbo_stream.remove @garment %>
+<%= turbo_stream.replace "wardrobe_status", partial: "garments/status", locals: { user: current_user } %>
+<% if current_user.garments.none? %>
+  <%= turbo_stream.update "garments", partial: "garments/empty" %>
+<% end %>
+<%= turbo_stream.update "flash", partial: "shared/flash" %>

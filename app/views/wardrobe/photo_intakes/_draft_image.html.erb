@@ -1,0 +1,14 @@
+<%# locals: (draft:) %>
+<div id="<%= dom_id(draft, :image) %>" class="aspect-square overflow-hidden rounded-[var(--radius-md)]" style="background: var(--panel);"
+     data-image-state="<%= draft.image.attached? ? 'ready' : (draft.pending? ? 'pending' : 'placeholder') %>">
+  <% if draft.image.attached? %>
+    <%= image_tag main_app.rails_blob_path(draft.image, only_path: true), alt: draft.name, class: "h-full w-full object-contain" %>
+  <% elsif draft.pending? %>
+    <div class="flex h-full items-center justify-center p-2">
+      <%= render "shared/spinner", message: "Creating image…" %>
+    </div>
+  <% else %>
+    <%= image_tag "placeholders/#{draft.category.presence_in(Garment::CATEGORIES) || 'top'}.jpg", alt: draft.name,
+                  class: "h-full w-full object-contain" %>
+  <% end %>
+</div>

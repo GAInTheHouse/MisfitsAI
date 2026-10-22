@@ -165,5 +165,110 @@ photo_scanning_messages:
 
 starter_catalog:
   - { id: cat-white-tee, name: White T-shirt, category: top, color: white, formality: casual, sub_category: t_shirt }
+  - { id: cat-black-tee, name: Black T-shirt, category: top, color: black, formality: casual, sub_category: t_shirt }
+  - { id: cat-gray-hoodie, name: Gray Hoodie, category: top, color: gray, formality: casual, sub_category: hoodie }
+  - { id: cat-white-oxford, name: White Oxford Shirt, category: top, color: white, formality: business, sub_category: shirt }
+  - { id: cat-stripe-shirt, name: Striped Button-down, category: top, color: blue, formality: smart_casual, sub_category: shirt }
+  - { id: cat-knit-sweater, name: Knit Sweater, category: top, color: cream, formality: smart_casual, sub_category: sweater }
+  - { id: cat-black-blazer, name: Black Blazer, category: top, color: black, formality: business, sub_category: blazer }
   - { id: cat-blue-jeans, name: Blue Jeans, category: bottom, color: blue, formality: casual, sub_category: jeans }
+  - { id: cat-black-jeans, name: Black Jeans, category: bottom, color: black, formality: smart_casual, sub_category: jeans }
+  - { id: cat-khaki-chinos, name: Khaki Chinos, category: bottom, color: khaki, formality: smart_casual, sub_category: chinos }
+  - { id: cat-navy-shorts, name: Navy Shorts, category: bottom, color: navy, formality: casual, sub_category: shorts }
+  - { id: cat-black-trousers, name: Black Dress Pants, category: bottom, color: black, formality: business, sub_category: dress_pants }
+  - { id: cat-gray-sweats, name: Gray Sweatpants, category: bottom, color: gray, formality: casual, sub_category: sweatpants }
   - { id: cat-white-sneakers, name: White Sneakers, category: shoes, color: white, formality: casual, sub_category: sneakers }
+  - { id: cat-black-sneakers, name: Black Sneakers, category: shoes, color: black, formality: casual, sub_category: sneakers }
+  - { id: cat-chelsea-boots, name: Black Chelsea Boots, category: shoes, color: black, formality: smart_casual, sub_category: boots }
+  - { id: cat-brown-loafers, name: Brown Loafers, category: shoes, color: brown, formality: smart_casual, sub_category: loafers }
+  - { id: cat-running-shoes, name: Running Shoes, category: shoes, color: white, formality: casual, sub_category: sneakers }
+  - { id: cat-denim-jacket, name: Denim Jacket, category: outerwear, color: blue, formality: casual, sub_category: jacket }
+  - { id: cat-black-puffer, name: Black Puffer Jacket, category: outerwear, color: black, formality: casual, sub_category: jacket }
+  - { id: cat-trench-coat, name: Beige Trench Coat, category: outerwear, color: beige, formality: smart_casual, sub_category: coat }
+
+# --- Phase 2: garment search lists (design doc 6.5, 12.3) ---
+
+# Copied in the order the doc lists them. The doc says "50", but its list has 51 names (see docs/handoff/phase-2.md).
+search_brands:
+  - Abercrombie & Fitch
+  - Adidas
+  - American Eagle
+  - Ann Taylor
+  - Anthropologie
+  - Athleta
+  - Banana Republic
+  - Brooks Brothers
+  - Calvin Klein
+  - Carhartt
+  - Champion
+  - Coach
+  - Columbia
+  - Converse
+  - Crocs
+  - Dickies
+  - Everlane
+  - Express
+  - Forever 21
+  - Free People
+  - Gap
+  - H&M
+  - Hollister
+  - J.Crew
+  - Kate Spade
+  - Levi's
+  - Loft
+  - Lululemon
+  - Madewell
+  - Michael Kors
+  - New Balance
+  - Nike
+  - Nordstrom
+  - Old Navy
+  - Patagonia
+  - Ralph Lauren
+  - Reebok
+  - Skechers
+  - The North Face
+  - Timberland
+  - Tommy Hilfiger
+  - Tory Burch
+  - UGG
+  - Under Armour
+  - Uniqlo
+  - Urban Outfitters
+  - Urban Revivo
+  - Vans
+  - Vineyard Vines
+  - Wrangler
+  - Zara
+
+search_materials:
+  - Canvas
+  - Cashmere
+  - Chiffon
+  - Corduroy
+  - Cotton
+  - Denim
+  - Fleece
+  - Jersey
+  - Knit
+  - Leather
+  - Linen
+  - Mesh
+  - Nylon
+  - Polyester
+  - Satin
+  - Silk
+  - Spandex
+  - Suede
+  - Tweed
+  - Velvet
+  - Wool
+
+search_kinds_by_category:
+  top: [ Blazer, Blouse, Bodysuit, Button-down shirt, Cardigan, Crop top, Flannel shirt, Halter neck, Henley, Hoodie, Oxford shirt, Polo shirt, Sweater, Sweatshirt, T-shirt, Tank top, Turtleneck, Vest ]
+  bottom: [ Cargo pants, Chinos, Culottes, Dress pants, Jeans, Leggings, Shorts, Skirt, Sweatpants, Trousers, Wide-leg pants ]
+  shoes: [ Ankle boots, Ballet flats, Chelsea boots, Heels, Knee-high boots, Loafers, Oxfords, Running shoes, Sandals, Slides, Sneakers ]
+  accessory: [ Backpack, Beanie, Belt, Bracelet, Crossbody bag, Earrings, Hair accessory, Handbag, Hat, Necklace, Scarf, Socks, Sunglasses, Tie, Tote bag, Watch ]
+  dress: [ Midi dress, Maxi dress, Mini dress, Wrap dress, Shift dress, Shirt dress, Sundress, Cocktail dress, Slip dress, Knit dress ]
+  outerwear: [ Trench coat, Peacoat, Puffer jacket, Parka, Denim jacket, Leather jacket, Blazer, Bomber jacket, Fleece jacket, Wool coat ]

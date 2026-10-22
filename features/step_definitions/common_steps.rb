@@ -37,7 +37,23 @@ Then("I should see {string}") do |text|
 end
 
 When("background jobs finish") do
-  perform_enqueued_jobs
+  # A job can enqueue more jobs (photo extraction -> draft images; retries), and perform_enqueued_jobs
+  # only runs the jobs queued when it is called, so drain until the queue is empty (design doc 8.1).
+  rounds = 0
+  until enqueued_jobs.empty?
+    rounds += 1
+    raise "Background jobs still enqueued after 20 rounds: #{enqueued_jobs.map { _1[:job] }.tally}" if rounds > 20
+
+    perform_enqueued_jobs
+  end
+
+  # Jobs report back through Turbo Stream broadcasts. A browser (@javascript) receives them; rack-test does
+  # not, so reload the page there instead (design doc 8.1). Only after a GET, never replaying a form post.
+  if Capybara.current_driver == :rack_test && page.driver.browser.last_request&.get?
+    visit page.driver.browser.last_request.fullpath
+  end
+rescue Rack::Test::Error
+  nil # no page visited yet: nothing to reload
 end
 
 Given("today is {string}") do |date|

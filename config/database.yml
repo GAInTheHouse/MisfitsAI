@@ -57,6 +57,9 @@ development:
 test:
   <<: *default
   database: misfit_test
+  # db:prepare seeds a database it creates; the test database must start empty (tests create their own data,
+  # and spec/seeds calls load_seed explicitly). Development and production seeding are unchanged.
+  seeds: false
 
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is

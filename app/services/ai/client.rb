@@ -1,12 +1,7 @@
 # frozen_string_literal: true
 
 module Ai
-  class Error < StandardError; end
-  class TransientError < Error; end
-  class ContentBlockedError < Error; end
-  class QuotaExceededError < Error; end
-  class DisabledError < Error; end
-
+  # Errors live in their own files (app/services/ai/*_error.rb) so they autoload on first use.
   class Client
     def self.current
       @current = nil if Rails.env.test? # allow adapter switching in tests

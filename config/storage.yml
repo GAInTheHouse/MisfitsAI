@@ -10,4 +10,14 @@ google:
   service: GCS
   project: <%= ENV["GOOGLE_CLOUD_PROJECT"] %>
   bucket: <%= ENV["GCS_BUCKET"] %>
-  credentials: <%= ENV.fetch("GOOGLE_SERVICE_ACCOUNT_JSON", "{}") %>
+  # A service-account key (single-line JSON) when set. Blank or absent: no credentials, so the client uses
+  # Application Default Credentials (gcloud auth application-default login, or the runtime's identity).
+<% if ENV["GOOGLE_SERVICE_ACCOUNT_JSON"].present? %>
+  credentials: <%= ENV["GOOGLE_SERVICE_ACCOUNT_JSON"] %>
+<% end %>
+  # Keyless signed URLs: sign through the IAM Credentials API (signBlob) as this service account, authenticating
+  # with ADC. Blank or absent: signed URLs use the credentials' own private key, as before.
+<% if ENV["GCS_SIGNING_SERVICE_ACCOUNT"].present? %>
+  iam: true
+  gsa_email: <%= ENV["GCS_SIGNING_SERVICE_ACCOUNT"].strip.to_json %>
+<% end %>
