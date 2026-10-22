@@ -1,4 +1,5 @@
-<%# locals: (garment:, class: nil) %>
-<%# Contract for later phases (design doc 6.3, 10.1): one stable id per garment so image-ready broadcasts can replace it. %>
+<%# locals: (garment:, class: "h-full w-full object-cover") %>
+<%# Contract for later phases (design doc 6.3, 10.1): one stable id per garment so image-ready broadcasts can replace it.
+    Broadcasts re-render it with the default class, so size and shape the wrapping element rather than passing a class. %>
 <%= image_tag garment_image_source(garment, :thumb), id: dom_id(garment, :thumb), alt: garment.name, loading: "lazy",
-              class: local_assigns[:class], width: 256, height: 256 %>
+              class: binding.local_variable_get(:class), width: 256, height: 256 %>

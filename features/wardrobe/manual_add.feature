@@ -4,13 +4,12 @@ Feature: Add a garment manually
   So that it can be used in my outfit plans
 
   # Design doc 6.4 (Manual add, GenerateGarmentImageJob).
-  # Scenarios that need AI image generation stay @wip until Phase 2 Step 5.
+  # AI image generation uses the fake adapter (features/support/ai_fake.rb).
 
   Background:
     Given I am signed in as an onboarded user
     And I am on the wardrobe page
 
-  @wip
   Scenario: Add a garment with a generated product image
     When I fill in "Name" with "White Oxford Shirt"
     And I choose the category "Top"
@@ -20,7 +19,6 @@ Feature: Add a garment manually
     When background jobs finish
     Then the garment "White Oxford Shirt" should have a generated image
 
-  @wip
   Scenario: Add a garment without generating an image
     When I fill in "Name" with "Navy Chinos"
     And I choose the category "Bottom"
@@ -67,7 +65,6 @@ Feature: Add a garment manually
     And the "Name" field should be empty
     And my wardrobe should contain "Linen Shirt"
 
-  @wip
   Scenario: Image generation disabled falls back to the placeholder
     Given AI image generation is disabled
     When I fill in "Name" with "Black Blazer"
@@ -77,7 +74,6 @@ Feature: Add a garment manually
     Then my wardrobe should contain "Black Blazer"
     And the garment "Black Blazer" should use a placeholder image
 
-  @wip
   Scenario: A blocked image falls back to the placeholder
     Given the AI blocks images for "garment_image"
     When I fill in "Name" with "Red Midi Dress"
@@ -86,3 +82,25 @@ Feature: Add a garment manually
     And background jobs finish
     Then my wardrobe should contain "Red Midi Dress"
     And the garment "Red Midi Dress" should use a placeholder image
+
+  @javascript
+  Scenario: The generated image appears without reloading the page
+    When I fill in "Name" with "Navy Peacoat"
+    And I choose the category "Outerwear"
+    And I click "Add to wardrobe"
+    Then I should see the garment "Navy Peacoat"
+    When background jobs finish
+    Then the card for "Navy Peacoat" should update to its generated image
+
+  Scenario: A failed image can be retried
+    Given the AI service fails for "garment_image"
+    When I fill in "Name" with "Grey Hoodie"
+    And I choose the category "Top"
+    And I click "Add to wardrobe"
+    And background jobs finish
+    And I am on the wardrobe page
+    Then the garment "Grey Hoodie" should show the button "Retry image"
+    When the AI service recovers for "garment_image"
+    And I click "Retry image"
+    And background jobs finish
+    Then the garment "Grey Hoodie" should have a generated image

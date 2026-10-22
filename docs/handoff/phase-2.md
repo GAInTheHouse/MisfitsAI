@@ -11,7 +11,8 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 | 1. Acceptance specs | Done (approved; fast-forwarded from `p2/acceptance-specs`) |
 | 2. Test infrastructure and prerequisites | Done (approved) |
 | 3. Model layer | Done (approved) |
-| 4. Wardrobe UI and manual garment management | In review |
+| 4. Wardrobe UI and manual garment management | Done (approved) |
+| 5. AI image generation and bulk garment creation | In review |
 
 ## Shipped
 
@@ -43,6 +44,15 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
   - Specs: `spec/requests/garments_spec.rb`, `spec/services/wardrobe/set_hidden_spec.rb`, `spec/views/garments/_thumb.html.erb_spec.rb`, `spec/support/turbo_streams.rb`.
   - Activated scenarios: 4 in `manual_add.feature`, all 9 in `manage.feature`, the two feature-flag tab scenarios; added "The add panel offers every way to add garments" and two `@javascript` scenarios (Turbo Stream create; in-place hide and frame filtering).
 
+- AI image generation and bulk creation (Step 5):
+  - `Wardrobe::Prompts.garment_image` (exact 6.4 prompt; optional clauses only when set).
+  - `Wardrobe::GenerateGarmentImageJob` (`ai_images` queue): Imagen through `Ai::Client`, normalized to a `GARMENT_ASSET_SIZE` (512) square JPEG, `image_status: ready`, broadcasts `garments/_garment` and `garments/_thumb` to `[user, :wardrobe]`. Disabled / quota / blocked -> `placeholder`, no retry. `Ai::TransientError` -> 3 attempts, then `failed`. Deleted garment -> discarded. Anything else -> `failed` and re-raised. Skips garments that already have a ready image.
+  - Manual add's "Generate a product image" checkbox queues the job; the garment stays `placeholder` until the image is attached (6.4).
+  - `POST /garments/:id/retry_image`: a `failed` garment goes back to `pending` and is queued again; failed cards show "Image unavailable" and a "Retry image" button.
+  - `Wardrobe::AddGarments.call(user:, items:, source:, generate_images: true)` and `Wardrobe::StarterImport.call(user:, items:)` (4.2 contracts, see Decisions).
+  - Specs: `spec/jobs/wardrobe/generate_garment_image_job_spec.rb`, `spec/services/wardrobe/{prompts,add_garments,starter_import}_spec.rb`, request specs for the checkbox and retry; `spec/support/env_helpers.rb`.
+  - Activated the 4 remaining `manual_add.feature` scenarios; added "The generated image appears without reloading the page" (`@javascript`, proves job broadcasts reach the browser) and "A failed image can be retried".
+
 ## Not done / deferred
 
 - Everything after Step 1. See `Progress`.
@@ -65,6 +75,7 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 - **Layout favicon links** (`app/views/layouts/application.html.erb`): the Rails 8 default `<link rel="icon">` / `apple-touch-icon` tags for `public/icon.png` and `icon.svg`. Without them Chrome requests `/favicon.ico`, which raises a routing error that Capybara re-raises and fails every passing `@javascript` scenario.
 - **Authorization spec** (`spec/requests/authorization_spec.rb`): Phase 2 cases for `retry_image` and the wardrobe page (8.4: each phase adds its routes).
 - **CSS:** `.input` for form fields.
+- **Fixed on behalf of Phase 1: AI error classes autoload** (`app/services/ai/{error,transient_error,content_blocked_error,quota_exceeded_error,disabled_error}.rb`). They were defined inside `ai/client.rb`, so Zeitwerk could only find them after `Ai::Client` had loaded; a job's class-level `retry_on Ai::TransientError` (the 2.4 pattern) raised `NameError` in development and test (CI hid it by eager loading). Each class now has its own file with an identical definition; `client.rb` no longer declares them. `bin/rails zeitwerk:check` passes. Owner to notify: Dev 1.
 - **Fixed on behalf of Phase 1: flash container** (`app/controllers/application_controller.rb`). `handle_application_error` answered Turbo Stream requests with `turbo_stream.replace("flash", ...)`, but `shared/flash` has no `#flash` wrapper, so the first error removed the container and later messages had nowhere to go. It now uses `turbo_stream.update`. Regression spec: `spec/controllers/application_controller_spec.rb` (fails on the old code). Owner to notify: Dev 1.
 - **`spec/examples.txt` untracked.** It was committed but RSpec rewrites it on every run (per-machine state). Removed from the index with `git rm --cached` (the local file is kept) and added to `.gitignore`.
 
@@ -104,6 +115,17 @@ Planned, not yet made (to be confirmed in their steps):
 - [DECISION] `PATCH /garments/:id/hide` without `hidden` hides (keeps Phase 1's behavior).
 - [DECISION] Form objects are built with `Garment.new`, never `current_user.garments.new`: an unsaved record must not join the user's loaded association, where `size`/`none?` would count it. Found by the acceptance tests.
 - [DECISION] The "Generate a product image" checkbox is shown (checked) but has no effect until Step 5 wires it to `GenerateGarmentImageJob`.
+- [DECISION] `AddGarments` / `StarterImport` save all items in one transaction (an invalid item raises `ActiveRecord::RecordInvalid` and nothing is kept), queue the image jobs with `ActiveJob.perform_all_later` after the transaction, and return `Array<Garment>`. With images requested the status is `pending` (6.3), otherwise `placeholder`. Unknown item keys are ignored; `color` is accepted for `color_primary`. Phase 4 should validate onboarding rows before calling.
+- [DECISION] Image jobs from `AddGarments` are queued in `ActiveRecord.after_all_transactions_commit`, so they wait for every open transaction, including a caller's outer one, and a rollback queues nothing. The app keeps `enqueue_after_transaction_commit` off, so this is explicit. Specs cover the rollback and the outer-commit case.
+- [DECISION] Duplicate image work (Step 5 review):
+  - `GenerateGarmentImageJob` uses Solid Queue `limits_concurrency` (one run per garment, key `garment-image-<id>`, 10-minute window). A second run waits, then sees the ready image and stops without an AI call.
+  - The attach happens under a row lock and is skipped when a ready image is already there, so a finished image is never overwritten.
+  - `retry_image` claims the garment with one compare-and-set `UPDATE` (`failed` -> `pending`), so simultaneous clicks queue one job.
+- [DECISION] `StarterImport` defaults the season to `all_season` (12.3) and accepts the catalog's `sub_category`.
+- [DECISION] The receipt price note (`fit_notes = "Receipt price: $%.2f"`, 6.12) is built by the receipts caller in Step 8, not by `AddGarments`.
+- [DECISION] After the last transient failure the garment is `failed` (not `placeholder`), so the card can offer "Retry image" (4.3). Placeholder means "no image by design" (switched off, over quota, blocked) and offers no retry.
+- [DECISION] `IMAGE_GEN_SPACING_SEC` is not used: each job generates one image, and production runs `ai_images` with one thread (6.4 rule 5).
+- [DECISION] `garments/_thumb` takes an optional `class:` with the default `h-full w-full object-cover`. Broadcasts re-render it with the default, so callers should size the wrapping element.
 - [DECISION] Extra scenarios beyond the 12.1 minimum: a category is required, an 80-character name limit, the image kill switch and the blocked-image fallback, a private-address image is never fetched (4.4), the 6-draft cap, draft image failure, discard, the source photo is purged, and the feature flags hide the Photo AI and Receipt tabs.
 
 ## Known issues (Phase 1, to file; not blocking Phase 2)
@@ -116,7 +138,15 @@ Planned, not yet made (to be confirmed in their steps):
 - `AVATAR_IMAGEN_MODEL` is not read; avatars use `IMAGEN_MODEL` (Phase 4 concern).
 - `APP_HOST` is not read (OmniAuth `full_host`, mailer host is hardcoded to `example.com`).
 
+- `Media::InvalidImageError`, `Media::UnsafeUrlError`, `Media::FetchError` and `Media::BLOCKED_HOSTS` have the same autoload problem as the AI errors had (defined inside `image_normalizer.rb` / `safe_fetcher.rb`). Not referenced at class level yet; to be fixed with the SafeFetcher hardening (G5) in Step 6.
 - `app/views/shared/_pill_group.html.erb`: its magic comment `<%# locals: name:, options:, selected: nil, multiple: false %>` is not strict-locals syntax (no parentheses), so the defaults are never applied and any caller that omits `multiple:` or `selected:` raises `NameError`. Phase 2 passes both explicitly.
+
+## Concurrency limitations (image generation)
+
+- `limits_concurrency` only works with the Solid Queue adapter (development and production). The test adapter ignores it; the row-lock overwrite guard is what the specs exercise.
+- If one run lasts longer than the 10-minute concurrency window (a very slow Imagen call plus retries), a second run may start and make a second AI call. Its image is then discarded by the overwrite guard, so the cost is one extra call, never a replaced image.
+- Several jobs for one garment can still be queued (e.g. two manual adds of separate garments are fine; one garment queued twice runs twice in sequence). The second run makes no AI call because the image is ready.
+- The double-click retry spec runs requests one after another, so it would also pass without the compare-and-set; the guard against truly simultaneous requests rests on the single `UPDATE ... WHERE image_status = 'failed'`.
 
 ## Schema changes after Phase 1
 

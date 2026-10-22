@@ -25,6 +25,8 @@ class GarmentsController < ApplicationController
     @garment = Garment.new(manual_garment_attributes.merge(user: current_user))
 
     if @garment.save
+      # The garment keeps image_status "placeholder" until the job attaches the image (design doc 6.4).
+      Wardrobe::GenerateGarmentImageJob.perform_later(@garment.id) if params[:generate_image] == "1"
       respond_to do |format|
         format.turbo_stream { flash.now[:notice] = added_notice }
         format.html { redirect_to wardrobe_path, notice: added_notice }
@@ -76,8 +78,19 @@ class GarmentsController < ApplicationController
     end
   end
 
+  # POST /garments/:id/retry_image: queue another product image after a failed attempt (design doc 4.3).
   def retry_image
-    render_coming_soon(title: "Retry image")
+    # Compare-and-set in one UPDATE, so two quick clicks (or two tabs) queue only one job.
+    claimed = current_user.garments.where(id: @garment.id, image_status: "failed")
+                          .update_all(image_status: "pending", updated_at: Time.current)
+    Wardrobe::GenerateGarmentImageJob.perform_later(@garment.id) if claimed == 1
+    @garment.reload
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace(@garment, partial: "garments/garment", locals: { garment: @garment })
+      end
+      format.html { redirect_back fallback_location: wardrobe_path }
+    end
   end
 
   private

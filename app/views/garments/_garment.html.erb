@@ -4,11 +4,15 @@
          style="background: var(--panel-strong); border-color: var(--line);" data-name="<%= garment.name %>" aria-label="<%= garment.name %>">
   <div class="relative aspect-square" style="background: var(--panel);">
     <%= image_tag garment_image_source(garment, :card), alt: garment.name, loading: "lazy",
-                  class: "h-full w-full object-contain", data: { image_source: (garment.image.attached? ? "upload" : "placeholder") } %>
+                  class: "h-full w-full object-contain", data: { image_source: (garment.image.attached? ? "attached" : "placeholder") } %>
     <% if garment.image_status == "pending" %>
       <div class="absolute inset-x-2 bottom-2 rounded-full px-3 py-1" style="background: var(--panel-strong);">
         <%= render "shared/spinner", message: "Creating image…" %>
       </div>
+    <% elsif garment.image_status == "failed" %>
+      <p class="absolute inset-x-2 bottom-2 rounded-full px-3 py-1 text-xs" style="background: var(--panel-strong); color: var(--muted);">
+        Image unavailable
+      </p>
     <% end %>
   </div>
   <div class="flex flex-1 flex-col gap-2 p-3">
@@ -29,6 +33,9 @@
       <% hidden = garment.hidden_from_recommendations %>
       <%= button_to (hidden ? "Show in outfits" : "Hide from outfits"), hide_garment_path(garment),
                     method: :patch, params: { hidden: !hidden }, class: "btn-ghost px-3 py-1 text-xs" %>
+      <% if garment.image_status == "failed" %>
+        <%= button_to "Retry image", retry_image_garment_path(garment), class: "btn-ghost px-3 py-1 text-xs" %>
+      <% end %>
       <%= button_to "Delete", garment_path(garment), method: :delete, class: "btn-ghost px-3 py-1 text-xs",
                     form: { data: { turbo_confirm: "Remove this item from your wardrobe?" } } %>
     </div>

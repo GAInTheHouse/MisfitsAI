@@ -20,6 +20,10 @@ Given("the AI blocks images for {string}") do |kind|
   Ai::Client::Fake.stub(kind, Ai::ContentBlockedError.new("Image blocked by safety filter"))
 end
 
+Given("the AI service recovers for {string}") do |kind|
+  Ai::Client::Fake.stubs.delete(kind)
+end
+
 Given("the {string} feature is disabled") do |flag|
   ENV["FEATURE_#{flag.upcase}"] = "false"
 end
@@ -88,12 +92,29 @@ Then("the garment {string} should not show the badge {string}") do |name, badge|
   within(garment_card_css(name)) { expect(page).to have_no_css(".badge", exact_text: badge) }
 end
 
-Then("the garment {string} should use a placeholder image") do |_name|
-  pending "Phase 2 Step 5"
+Then("the garment {string} should use a placeholder image") do |name|
+  expect(Garment.find_by!(user_id: @user.id, name: name).image).not_to be_attached
+  visit wardrobe_path
+  within(garment_card_css(name)) do
+    expect(page).to have_css(%(img[data-image-source="placeholder"][src*="/assets/placeholders/"]))
+  end
 end
 
-Then("the garment {string} should have a generated image") do |_name|
-  pending "Phase 2 Step 5"
+Then("the garment {string} should have a generated image") do |name|
+  garment = Garment.find_by!(user_id: @user.id, name: name)
+  expect(garment.image).to be_attached
+  expect(garment.image_status).to eq("ready")
+  visit wardrobe_path
+  within(garment_card_css(name)) do
+    expect(page).to have_css(%(img[data-image-source="attached"][src*="/rails/active_storage/representations/"]))
+  end
+end
+
+# Browser-only: waits for the job's Turbo Stream broadcast to swap the card image, without reloading.
+Then("the card for {string} should update to its generated image") do |name|
+  within(garment_card_css(name)) do
+    expect(page).to have_css(%(img[data-image-source="attached"][src*="/rails/active_storage/representations/"]))
+  end
 end
 
 Then("the garment {string} should have formality {string} and season {string}") do |name, formality, season|
@@ -109,7 +130,7 @@ Then("the garment {string} should have the fit note {string}") do |_name, _note|
 end
 
 Then("no AI image generation should have been requested") do
-  pending "Phase 2 Step 5"
+  expect(Ai::Client::Fake.calls.select { _1[:method] == :generate_image }).to be_empty
 end
 
 Then("the {string} field should be empty") do |label|
@@ -118,6 +139,10 @@ end
 
 Then("the current URL should include {string}") do |fragment|
   expect(page).to have_current_path(/#{Regexp.escape(fragment)}/)
+end
+
+Then("the garment {string} should show the button {string}") do |name, label|
+  within(garment_card_css(name)) { expect(page).to have_button(label, exact_text: true) }
 end
 
 Then("I should not see {string}") do |text|

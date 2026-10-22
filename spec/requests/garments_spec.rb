@@ -111,6 +111,21 @@ RSpec.describe "Garments", type: :request do
       )
     end
 
+    it "queues a product image when 'Generate a product image' is checked, keeping the placeholder status" do
+      expect { post garments_path, params: params.merge(generate_image: "1") }
+        .to have_enqueued_job(Wardrobe::GenerateGarmentImageJob).with(kind_of(String))
+      expect(user.garments.last.image_status).to eq("placeholder")
+    end
+
+    it "queues nothing when the box is unchecked" do
+      expect { post garments_path, params: params }.not_to have_enqueued_job(Wardrobe::GenerateGarmentImageJob)
+    end
+
+    it "queues nothing when the garment is invalid" do
+      expect { post garments_path, params: { garment: { name: "" }, generate_image: "1" } }
+        .not_to have_enqueued_job(Wardrobe::GenerateGarmentImageJob)
+    end
+
     it "keeps chosen formality and season" do
       post garments_path, params: { garment: { name: "Wool Coat", category: "outerwear", formality: "business",
                                                 seasonality: "cold" } }
@@ -175,6 +190,37 @@ RSpec.describe "Garments", type: :request do
       patch hide_garment_path(foreign), params: { hidden: "true" }
       expect(response).to have_http_status(:not_found)
       expect(foreign.reload.hidden_from_recommendations).to be(false)
+    end
+  end
+
+  describe "POST /garments/:id/retry_image" do
+    it "queues a new image for a failed garment and shows it as pending" do
+      garment = create(:garment, user: user, image_status: "failed")
+      expect { post retry_image_garment_path(garment), headers: turbo_stream }
+        .to have_enqueued_job(Wardrobe::GenerateGarmentImageJob).with(garment.id)
+      expect(garment.reload.image_status).to eq("pending")
+      expect(response.body).to include(%(target="garment_#{garment.id}"), "Creating image")
+    end
+
+    it "queues only one job when Retry image is clicked twice" do
+      garment = create(:garment, user: user, image_status: "failed")
+      expect do
+        2.times { post retry_image_garment_path(garment), headers: turbo_stream }
+      end.to have_enqueued_job(Wardrobe::GenerateGarmentImageJob).exactly(:once)
+    end
+
+    it "does nothing for a garment whose image is not failed" do
+      garment = create(:garment, :with_image, user: user)
+      expect { post retry_image_garment_path(garment) }.not_to have_enqueued_job(Wardrobe::GenerateGarmentImageJob)
+      expect(garment.reload.image_status).to eq("ready")
+    end
+
+    it "shows the Retry image button only on failed cards" do
+      create(:garment, user: user, name: "Failed One", image_status: "failed")
+      create(:garment, user: user, name: "Fine One")
+      get wardrobe_path
+      expect(response.body.scan("Retry image").size).to eq(1)
+      expect(response.body).to include("Image unavailable")
     end
   end
 
