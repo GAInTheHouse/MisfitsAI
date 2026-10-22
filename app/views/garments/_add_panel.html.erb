@@ -21,7 +21,10 @@
     <div role="tabpanel" id="add_panel_<%= key %>" aria-labelledby="add_tab_<%= key %>" data-shared--tabs-target="panel" <%= "hidden" unless index == default_index %>>
       <% case key %>
       <% when "photo_ai" %>
-        <%= render "shared/empty_state", title: "Photo AI", message: "Coming soon" %>
+        <%# Loaded when the tab is opened (design doc 6.4: lazily loaded frames). %>
+        <%= turbo_frame_tag "photo_intake", src: new_wardrobe_photo_intake_path, loading: :lazy do %>
+          <%= render "shared/spinner", message: "Loading…" %>
+        <% end %>
       <% when "receipt" %>
         <%= render "shared/empty_state", title: "Receipt", message: "Coming soon" %>
       <% when "describe" %>

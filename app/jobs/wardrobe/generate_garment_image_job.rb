@@ -55,14 +55,8 @@ module Wardrobe
       broadcast(garment)
     end
 
-    # Same partials as the first render (design doc 2.4): the wardrobe card and the thumbnail used by
-    # onboarding and the outfit pages. Missing targets are ignored by Turbo.
     def broadcast(garment)
-      stream = [ garment.user, :wardrobe ]
-      Turbo::StreamsChannel.broadcast_replace_to(stream, target: garment, partial: "garments/garment",
-                                                         locals: { garment: garment })
-      Turbo::StreamsChannel.broadcast_replace_to(stream, target: ActionView::RecordIdentifier.dom_id(garment, :thumb),
-                                                         partial: "garments/thumb", locals: { garment: garment })
+      Wardrobe::GarmentBroadcasts.image_changed(garment)
     end
   end
 end

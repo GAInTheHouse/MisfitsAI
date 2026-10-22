@@ -60,11 +60,7 @@ module Wardrobe
     end
 
     def broadcast(garment)
-      stream = [ garment.user, :wardrobe ]
-      Turbo::StreamsChannel.broadcast_replace_to(stream, target: garment, partial: "garments/garment",
-                                                         locals: { garment: garment })
-      Turbo::StreamsChannel.broadcast_replace_to(stream, target: ActionView::RecordIdentifier.dom_id(garment, :thumb),
-                                                         partial: "garments/thumb", locals: { garment: garment })
+      Wardrobe::GarmentBroadcasts.image_changed(garment)
     end
   end
 end

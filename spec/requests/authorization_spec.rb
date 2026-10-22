@@ -34,4 +34,23 @@ RSpec.describe "Authorization", type: :request do
     get wardrobe_path
     expect(response.body).not_to include(garment.name)
   end
+
+  describe "photo intake (Phase 2)" do
+    let(:batch) { create(:intake_batch, user: user_a, status: "ready") }
+    let!(:draft) { create(:garment_draft, :ready, intake_batch: batch) }
+
+    it "returns 404 for another user's batch, commit, discard and draft" do
+      get wardrobe_photo_intake_path(batch)
+      expect(response).to have_http_status(:not_found)
+      post commit_wardrobe_intake_batch_path(batch)
+      expect(response).to have_http_status(:not_found)
+      delete wardrobe_intake_batch_path(batch)
+      expect(response).to have_http_status(:not_found)
+      patch wardrobe_draft_path(draft), params: { draft: { name: "Hijacked" } }
+      expect(response).to have_http_status(:not_found)
+
+      expect(user_b.garments).to be_empty
+      expect(batch.reload.garment_drafts.first.name).not_to eq("Hijacked")
+    end
+  end
 end

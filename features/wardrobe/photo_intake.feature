@@ -5,12 +5,11 @@ Feature: Add garments from an outfit photo
 
   # Design doc 6.6 (Photo AI intake) and 12.1 (sample scenarios).
   # The AI is always the fake adapter.
-  # Scenarios stay @wip until Phase 2 Step 7 implements photo intake (the tab flag works since Step 4).
 
   Background:
     Given I am signed in as an onboarded user
 
-  @wip @javascript
+  @javascript
   Scenario: Review and commit detected garments
     Given the AI will detect these garments in my photo:
       | item_type        | category | color | formality | seasonality |
@@ -25,7 +24,20 @@ Feature: Add garments from an outfit photo
     And my wardrobe should contain "Crewneck Sweater"
     And my wardrobe should not contain "Straight Jeans"
 
-  @wip
+  @javascript
+  Scenario: Photo intake from the wardrobe's Photo AI tab
+    Given the AI will detect these garments in my photo:
+      | item_type      | category | color | formality | seasonality |
+      | denim jacket   | outerwear | blue | casual    | mild        |
+    And I am on the wardrobe page
+    When I upload "outfit.jpg" on the Photo AI tab
+    Then I should see "Scanning your photo"
+    When background jobs finish
+    Then I should see 1 draft garment
+    When I click "Add selected"
+    Then I should see "1 item added"
+    And I should see the garment "Denim Jacket"
+
   Scenario: Committed garments keep the detected details
     Given the AI will detect these garments in my photo:
       | item_type        | category | color | formality | seasonality | pattern | material |
@@ -37,14 +49,12 @@ Feature: Add garments from an outfit photo
       | category | color_primary | formality | seasonality | pattern | material | source |
       | top      | cream         | casual    | cold        |         | wool     | photo  |
 
-  @wip
   Scenario: No garments detected
     Given the AI will detect no garments in my photo
     When I upload "blank.jpg" on the Photo AI tab
     And background jobs finish
     Then I should see "No garments detected from image. Please upload a clearer outfit photo."
 
-  @wip
   Scenario: The AI fails to analyze the photo
     Given the AI service fails for "garment_extraction"
     When I upload "outfit.jpg" on the Photo AI tab
@@ -52,14 +62,12 @@ Feature: Add garments from an outfit photo
     Then I should see "We couldn't analyze that photo right now. Please try again."
     And I should see the button "Try again"
 
-  @wip
   Scenario: At most six drafts are created from one photo
     Given the AI will detect 8 garments in my photo
     When I upload "outfit.jpg" on the Photo AI tab
     And background jobs finish
     Then I should see 6 draft garments
 
-  @wip
   Scenario: A draft whose image fails can still be committed
     Given the AI will detect these garments in my photo:
       | item_type      | category | color | formality | seasonality |
@@ -72,7 +80,6 @@ Feature: Add garments from an outfit photo
     Then my wardrobe should contain "Straight Jeans"
     And the garment "Straight Jeans" should use a placeholder image
 
-  @wip
   Scenario: Discard a photo intake
     Given the AI will detect these garments in my photo:
       | item_type        | category | color | formality | seasonality |
@@ -83,7 +90,6 @@ Feature: Add garments from an outfit photo
     Then I should see 0 draft garments
     And my wardrobe should be empty
 
-  @wip
   Scenario: The uploaded photo is not kept after analysis
     Given the AI will detect these garments in my photo:
       | item_type        | category | color | formality | seasonality |
@@ -92,13 +98,11 @@ Feature: Add garments from an outfit photo
     And background jobs finish
     Then the uploaded photo should not be kept
 
-  @wip
   Scenario: A photo over 15 MB is rejected
     When I upload a 16 MB photo on the Photo AI tab
     Then I should see "Image too large"
     And no AI analysis should have been requested
 
-  @wip
   Scenario: A file that is not an image is rejected
     When I upload a non-image file on the Photo AI tab
     Then I should see "Please upload a JPEG, PNG, WebP or HEIC image"

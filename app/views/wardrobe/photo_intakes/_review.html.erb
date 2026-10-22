@@ -1,0 +1,26 @@
+<%# locals: (batch:) %>
+<% drafts = batch.garment_drafts.reject(&:committed?).sort_by { [ _1.position.to_i, _1.created_at ] } %>
+<div class="space-y-4" data-controller="wardrobe--draft-selection">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h3 class="font-medium">Review detected items</h3>
+    <div class="flex gap-2" data-wardrobe--draft-selection-target="toolbar" hidden>
+      <button type="button" class="btn-ghost px-3 py-1 text-xs" data-action="wardrobe--draft-selection#selectAll">Select all</button>
+      <button type="button" class="btn-ghost px-3 py-1 text-xs" data-action="wardrobe--draft-selection#selectNone">Select none</button>
+    </div>
+  </div>
+  <%= render "wardrobe/photo_intakes/progress", batch: batch %>
+
+  <%= form_with url: commit_wardrobe_intake_batch_path(batch), id: "draft_review_form", data: { turbo_frame: "_top" } do |f| %>
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <% drafts.each do |draft| %>
+        <%= render "wardrobe/photo_intakes/draft", draft: draft %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="flex flex-wrap gap-2">
+    <button type="submit" form="draft_review_form" class="btn-primary">Add selected</button>
+    <%= button_to "Discard", wardrobe_intake_batch_path(batch), method: :delete, class: "btn-ghost",
+                  form: { data: { turbo_confirm: "Discard these detected items?" } } %>
+  </div>
+</div>

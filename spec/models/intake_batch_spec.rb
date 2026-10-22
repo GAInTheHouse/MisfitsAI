@@ -53,11 +53,12 @@ RSpec.describe IntakeBatch do
       expect(described_class.receipts).to contain_exactly(receipt)
     end
 
-    it ".stale returns batches older than 24 hours" do
+    it ".stale returns batches with no activity (updated_at) for more than 24 hours" do
       now = Time.zone.parse("2026-10-21 12:00")
-      old = create(:intake_batch, created_at: now - 25.hours)
-      create(:intake_batch, created_at: now - 23.hours)
-      expect(described_class.stale(now)).to contain_exactly(old)
+      idle = create(:intake_batch, created_at: now - 3.days, updated_at: now - 25.hours)
+      create(:intake_batch, created_at: now - 3.days, updated_at: now - 1.hour) # old but still active
+      create(:intake_batch, created_at: now - 1.hour, updated_at: now - 1.hour)
+      expect(described_class.stale(now)).to contain_exactly(idle)
     end
   end
 

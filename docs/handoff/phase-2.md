@@ -13,7 +13,8 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 | 3. Model layer | Done (approved) |
 | 4. Wardrobe UI and manual garment management | Done (approved) |
 | 5. AI image generation and bulk garment creation | Done (approved) |
-| 6. Garment image search and remote image import | In review |
+| 6. Garment image search and remote image import | Done (approved) |
+| 7. AI photo intake | In review |
 
 ## Shipped
 
@@ -62,7 +63,19 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
   - Specs: `spec/services/media/safe_fetcher_spec.rb` (rewritten, 36 examples), `spec/services/wardrobe/search/{filter_and_rank,image_search,add_result}_spec.rb`, `spec/jobs/wardrobe/import_remote_image_job_spec.rb`, `spec/requests/wardrobe/searches_spec.rb`; fixtures `spec/fixtures/serpapi/*.json`; `features/support/stubs/serpapi.rb`.
   - Activated all 9 `search.feature` scenarios; added a `@javascript` scenario for the whole flow inside the wardrobe page.
 
+- Photo intake (Step 7):
+  - `Wardrobe::PhotoIntakesController` (`new`, `create`, `show`; behind `Feature.enabled?(:photo_intake)`), `Wardrobe::IntakeBatchesController` (`commit`, `destroy`), `Wardrobe::DraftsController#update`. All lookups go through `current_user`.
+  - Upload checks: missing, empty, over 15 MB, and image type by content (JPEG/PNG/WebP/HEIC). `Wardrobe::PhotoIntake::ImagePreparer`: pixel count checked from the header (50 MP) before decoding, EXIF orientation, at most 1600 px, sRGB JPEG without alpha.
+  - `Wardrobe::ExtractGarmentsJob` (`ai_text`): exact 6.6 prompt and schema through `Ai::Client#generate_json`, `PhotoIntake::Mapper` (6.6 mapping, cap `VISION_MAX_GARMENT_IMAGES`), drafts, batch `ready`; failures with the 6.6 messages plus a quota and an unreadable-photo message; `Ai::TransientError` retried three times. The source photo is purged once the batch is ready or failed.
+  - `Wardrobe::GenerateDraftImageJob` (`ai_images`): draft product image (exact 6.6 prompt); failures leave the draft committable with the placeholder; progress 30 -> 100; broadcasts only the image area and progress; one run per draft; no AI call or attach for a draft committed meanwhile.
+  - Review UI (in the lazily loaded `photo_intake` frame of the Photo AI tab, or on its own page): scanning card with the 12.3 rotating copy, draft cards (image, "Add this item", name, category, badges, "Please double-check"), progress, Select all / Select none (`wardrobe--draft-selection`, JS only), "Add selected", "Discard" (with confirmation), failed state with "Try again".
+  - `Wardrobe::PhotoIntake::Commit` (see Decisions) and `Wardrobe::PurgeStaleDraftsJob` (daily at 4am, `config/recurring.yml`).
+  - Specs: mapper, prompts (compared to the doc text), image preparer, both jobs, purge job, request spec `spec/requests/wardrobe/photo_intakes_spec.rb`, authorization cases.
+  - Activated all 10 `photo_intake.feature` scenarios and added "Photo intake from the wardrobe's Photo AI tab" (`@javascript`).
+
 ## Not done / deferred
+
+- Photo intake click-to-zoom `<dialog>` (6.6, "may defer" in 11.2): not built; for Phase 4's stretch list.
 
 - Search re-ranking with the Ranking API (`SEARCH_RERANK_ENABLED`, 6.5 stretch): not built; for Phase 4's stretch list.
 
@@ -91,6 +104,8 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 - **CSP** (`config/initializers/content_security_policy.rb`): `img-src` adds exactly the hosts in `config.x.search_thumbnail_hosts` (`encrypted-tbn0..3.gstatic.com`, `serpapi.com`) for search preview thumbnails. `ImageSearch` renders a thumbnail only from those hosts over https (anything else shows "No preview", no `<img>`), so the CSP and the page use one list. Result images carry `referrerpolicy="no-referrer"`.
 - **Rack::Attack** (`config/initializers/rack_attack.rb`): garment search has its own throttle, `POST /wardrobe/searches` 10 per minute per user (4.4), matched by exact path, so adding a result (`/wardrobe/searches/select`) no longer spends it; adding results has a separate 30-per-minute-per-user throttle. Photo intake, receipts and avatar keep the shared 10-per-minute AI throttle. Specs: `spec/requests/rate_limits_spec.rb`.
 - **`Media::TransientFetchError`** (subclass of `FetchError`, so the contract is unchanged): raised for timeouts, network errors, the overall deadline and HTTP 408/429/5xx; everything else stays a plain `FetchError`.
+- **"When background jobs finish"** (`features/step_definitions/common_steps.rb`) now also reloads the page under rack-test after a GET (8.1: "then reloads the page"), because rack-test receives no Turbo Stream broadcasts. Browser scenarios are unchanged (they wait for the broadcast). It never replays a form post.
+- **AI fixture images** (`spec/fixtures/ai/*.png`): all ten were 1x1 PNGs with a bad zlib checksum (libvips printed `IDAT: incorrect data check`). Regenerated as valid 64x64 PNGs, one colour per kind, as 3.7 describes (8.2 allows refining fixtures).
 - **Test support:** `spec/support/fake_dns.rb` + `features/support/fake_dns.rb` (no real DNS in tests), `spec/support/cache.rb` + `features/support/cache.rb` (empty cache per test), `features/support/browser_network.rb` (browser scenarios may only load the test server).
 - **Fixed on behalf of Phase 1: AI error classes autoload** (`app/services/ai/{error,transient_error,content_blocked_error,quota_exceeded_error,disabled_error}.rb`). They were defined inside `ai/client.rb`, so Zeitwerk could only find them after `Ai::Client` had loaded; a job's class-level `retry_on Ai::TransientError` (the 2.4 pattern) raised `NameError` in development and test (CI hid it by eager loading). Each class now has its own file with an identical definition; `client.rb` no longer declares them. `bin/rails zeitwerk:check` passes. Owner to notify: Dev 1.
 - **Fixed on behalf of Phase 1: flash container** (`app/controllers/application_controller.rb`). `handle_application_error` answered Turbo Stream requests with `turbo_stream.replace("flash", ...)`, but `shared/flash` has no `#flash` wrapper, so the first error removed the container and later messages had nowhere to go. It now uses `turbo_stream.update`. Regression spec: `spec/controllers/application_controller_spec.rb` (fails on the old code). Owner to notify: Dev 1.
@@ -149,13 +164,26 @@ Planned, not yet made (to be confirmed in their steps):
 - [DECISION] Search errors answer with the status the error implies (422 missing query, 502 provider failure, 503 not configured, 504 timeout or connection failure) and render inside the results frame. SerpAPI's 200 "Google hasn't returned any results" is an empty result, not an error.
 - [DECISION] The remote import retries temporary failures (`Media::TransientFetchError`), three attempts in all with growing waits, keeping the garment `pending` meanwhile; after the last attempt, and immediately for any permanent failure (other 4xx, unsafe URL, too large, not an image), it keeps the placeholder (6.5). It runs on the `default` queue (no AI involved).
 - [DECISION] Search result links that carry an `api_key` parameter, or our key itself, are dropped before anything is rendered or stored.
+- [DEVIATION] 6.6: the response schema gains an optional `confidence` number (not required; prompt text unchanged) so the review can flag uncertain items. Drafts store `confidence` and `needs_confirmation`; a draft is flagged "Please double-check" when confidence is under 0.75 (the receipt threshold, 6.12) or when its category fell back to `top`.
+- [DECISION] Photo commit (`Wardrobe::PhotoIntake::Commit`):
+  - Edits (selected, name, category) are sent with the commit form, so the review works without JavaScript; `PATCH /wardrobe/drafts/:id` saves one draft on its own.
+  - Runs under a lock on the batch and only takes committable drafts, so committing twice never duplicates garments ("No new items to add.").
+  - The draft's image blob is attached to the garment and detached from the draft without purging. Rails would also refuse to purge a blob still attached elsewhere (its purge rescues the foreign-key error), so this is defence in depth that also avoids failing purge jobs.
+  - A draft whose image is still generating becomes a `pending` garment, recorded on the draft (`attrs["garment_id"]`, no schema change). `GenerateDraftImageJob` hands its image to that garment when it finishes, whether its AI call was in flight during the commit or had not started, so one AI call serves both. A `GenerateGarmentImageJob` queued 10 minutes later is the safety net if the draft job never delivers (failure, crash, purge): it finds the garment ready and stops without an AI call, or makes the image. A second AI call happens only in that failure case. Image-changed broadcasts are shared by the three image jobs (`Wardrobe::GarmentBroadcasts`).
+  - Invalid edits (e.g. a blank name) roll everything back and show the error (422).
+  - Success goes to the wardrobe page ("1 item added" / "N items added").
+- [DECISION] Stale batches (5.3 "older than 24 hours") are measured from the last activity, `updated_at`, which the intake jobs touch, so a batch still being processed is never purged; a batch idle for more than 24 hours (including one stuck in processing) is. `PurgeStaleDraftsJob` locks each batch (the lock `Commit` takes), checks it is still stale, then destroys it with its drafts and files; a batch already gone is skipped, so reruns are harmless. Committed drafts no longer hold images. `ExtractGarmentsJob` ends quietly if its batch is removed mid-run, and `GenerateDraftImageJob` is discarded for a removed draft; neither recreates rows.
+- [DECISION] Upload memory: Rack streams the multipart upload to a temp file; the controller checks size (no read) and type (first 64 KB) before anything else; Active Storage streams the upload; the job downloads the blob to a temp file (`blob.open`) and `ImagePreparer` reads from disk (type from the first 64 KB, pixel count from the header before decoding, libvips thumbnail from the file). The photo is never held whole in Ruby memory.
+- [DECISION] A failed photo shows "Try again", which discards the batch and returns to the upload form. The daily vision cap shows "You've reached today's photo analysis limit. Please try again tomorrow." An unreadable stored photo shows "We couldn't read that photo. Please upload a JPEG, PNG, WebP or HEIC image."
+- [DECISION] Draft image broadcasts replace only the image area and the progress bar, never the inputs, so edits made while images arrive are kept.
+- [DECISION] `turbo_stream_from` sits inside the `photo_intake` frame: when the frame navigates, Turbo keeps only the frame's contents, so a subscription outside it would be lost on the standalone page (found by the browser test).
+- [DECISION] `IntakeBatchesController#commit` handles photo batches only until Step 8 adds receipts.
 - [DECISION] Extra scenarios beyond the 12.1 minimum: a category is required, an 80-character name limit, the image kill switch and the blocked-image fallback, a private-address image is never fetched (4.4), the 6-draft cap, draft image failure, discard, the source photo is purged, and the feature flags hide the Photo AI and Receipt tabs.
 
 ## Known issues (Phase 1, to file; not blocking Phase 2)
 
 - Rails 8.0 end of life on 2026-11-07 (see above).
 - `spec/factories/users.rb` `:user_profile` factory always fails: it builds a user, whose `after_create` already creates the profile, then saves a second one (unique index on `user_profiles.user_id`). Found by `FactoryBot.lint`; the Phase 2 lint is scoped to Phase 2 factories until it is fixed.
-- `config/initializers/vips.rb` checks `defined?(Vips)`, but `ruby-vips` is `require: false`, so the memory limits never apply (R14 risk on Heroku).
 - Rack::Attack has no 60-per-hour per-user limit on AI POSTs (4.4).
 - `ApplicationJob` has no default queue or retry/discard policy.
 - `AVATAR_IMAGEN_MODEL` is not read; avatars use `IMAGEN_MODEL` (Phase 4 concern).
@@ -169,6 +197,10 @@ Planned, not yet made (to be confirmed in their steps):
 - If one run lasts longer than the 10-minute concurrency window (a very slow Imagen call plus retries), a second run may start and make a second AI call. Its image is then discarded by the overwrite guard, so the cost is one extra call, never a replaced image.
 - Several jobs for one garment can still be queued (e.g. two manual adds of separate garments are fine; one garment queued twice runs twice in sequence). The second run makes no AI call because the image is ready.
 - The double-click retry spec runs requests one after another, so it would also pass without the compare-and-set; the guard against truly simultaneous requests rests on the single `UPDATE ... WHERE image_status = 'failed'`.
+
+## Corrections to earlier notes
+
+- G9 (Step 0) was a false alarm: libvips is loaded at boot (through `image_processing`), so `config/initializers/vips.rb` does apply `cache_set_max(0)` and `concurrency_set(1)` (checked in production and test).
 
 ## Rate limits still to do
 
@@ -186,7 +218,7 @@ Planned, not yet made (to be confirmed in their steps):
 
 1. SerpAPI with a real `SERPAPI_KEY`: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use, and the thumbnail hosts are covered by the CSP (`*.gstatic.com`, `serpapi.com`).
 2. `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher`.
-3. Vertex `garment_extraction` and `receipt_extraction` with the Phase 2 response schemas against real Gemini.
+3. Vertex `garment_extraction` and `receipt_extraction` with the Phase 2 response schemas against real Gemini (including the optional `confidence` field), on real outfit photos (HEIC from a phone included).
 4. Imagen `garment_image` (garments and drafts), including the content-blocked fallback.
 5. GCS uploads and blob copies on draft commit (`GCS_BUCKET`, service account `storage.objectAdmin`).
 6. Second GCP billing check (design doc 3.4 step 6).
@@ -194,7 +226,6 @@ Planned, not yet made (to be confirmed in their steps):
 
 ## Still to do from the Phase 1 gap list
 
-- Step 7 hazard: committing a draft attaches the draft's image blob to the new garment (6.6 `garment.image.attach(draft.image.blob)`). Destroying the draft or batch afterwards would purge that shared blob, so the commit must detach the draft's attachment first (or not purge it). Cover this with a spec in Step 7.
 
 ## Working agreements for Phase 2 tests
 

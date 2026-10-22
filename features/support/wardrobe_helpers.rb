@@ -36,6 +36,22 @@ module WardrobeHelpers
     end
   end
 
+  # Uses the Photo AI form if it is on screen (the wardrobe tab, loaded lazily in the browser);
+  # otherwise opens the intake page (rack-test does not load lazy frames).
+  def upload_photo(path)
+    if page.has_css?("[role=tab]", exact_text: "Photo AI", visible: true, wait: 0)
+      find("[role=tab]", exact_text: "Photo AI").click
+    end
+    visit new_wardrobe_photo_intake_path unless page.has_css?("#photo_intake_form", visible: true, wait: 2)
+    within("#photo_intake_form") do
+      attach_file "Outfit photo", path.to_s
+      click_button "Analyze photo"
+    end
+    # In a browser the click returns before the upload finishes: wait until the batch card (or an upload
+    # error) is shown, so later steps (e.g. running the jobs) see the request's effects.
+    expect(page).to have_css("[id^='intake_batch_'], #photo_intake_form [role=alert]")
+  end
+
   private
 
   def css_string(value)

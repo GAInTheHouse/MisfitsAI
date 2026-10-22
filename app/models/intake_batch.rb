@@ -24,7 +24,9 @@ class IntakeBatch < ApplicationRecord
 
   scope :photos, -> { where(kind: "photo") }
   scope :receipts, -> { where(kind: "receipt") }
-  scope :stale, ->(now = Time.current) { where(created_at: ...(now - STALE_AFTER)) }
+  # No activity for 24 hours (design doc 5.3). Measured from updated_at, which the intake jobs touch
+  # (status and progress), so a batch still being processed is never stale.
+  scope :stale, ->(now = Time.current) { where(updated_at: ...(now - STALE_AFTER)) }
 
   KINDS.each do |value|
     define_method(:"#{value}?") { kind == value }

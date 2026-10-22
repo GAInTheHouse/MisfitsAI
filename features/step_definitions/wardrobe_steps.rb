@@ -126,8 +126,10 @@ Then("the garment {string} should have formality {string} and season {string}") 
   expect(Garment.find_by!(user_id: @user.id, name: name)).to have_attributes(formality: formality, seasonality: season)
 end
 
-Then("the garment {string} should have these details:") do |_name, _table|
-  pending "Phase 2 Step 7"
+Then("the garment {string} should have these details:") do |name, table|
+  garment = Garment.find_by!(user_id: @user.id, name: name)
+  expected = table.hashes.first
+  expect(expected.to_h { |column, _| [ column, garment.public_send(column).to_s ] }).to eq(expected)
 end
 
 Then("the garment {string} should have the fit note {string}") do |_name, _note|
@@ -162,8 +164,8 @@ Then("I should not see the link {string}") do |label|
   expect(page).to have_no_link(label, exact_text: true)
 end
 
-Then("I should see the button {string}") do |_label|
-  pending "Phase 2 Step 7"
+Then("I should see the button {string}") do |label|
+  expect(page).to have_button(label)
 end
 
 Then("I should see the tab {string}") do |label|
