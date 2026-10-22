@@ -189,6 +189,13 @@ The original sources were not available, so these were rebuilt. None of them cla
 - [DEVIATION] 8.4: the inputs in `spec/services/receipts/text_parser_spec.rb` are written from the 6.12 algorithm, because the original `receipt_parser.py` tests are not available.
 
 **Behaviour**
+- [DEVIATION] 3.4: Google authentication also supports Application Default Credentials for local development.
+  - **What the doc specifies:** `Ai::GoogleToken` always reads `GOOGLE_SERVICE_ACCOUNT_JSON`, because Heroku has no ADC.
+  - **What was built:**
+    - When `GOOGLE_SERVICE_ACCOUNT_JSON` is set and nonblank, the service-account key is used exactly as before. This is the deployment path, and its behaviour is unchanged.
+    - When the variable is absent or blank, `Google::Auth.get_application_default` is used instead (`gcloud auth application-default login`, `GOOGLE_APPLICATION_CREDENTIALS`, or the metadata server).
+  - **Why:** the team chose local integration testing with `gcloud` ADC rather than creating and downloading a service-account key (2026-10-22). Production keeps the doc's key-based setup.
+  - **Scope:** Vertex AI only. GCS authentication (`config/storage.yml`) is unchanged and still reads `GOOGLE_SERVICE_ACCOUNT_JSON`.
 - [DEVIATION] 6.12: the receipt review is a list of editable cards instead of a table, so it works at 390 px. It has the fields 6.12 lists.
 - [DEVIATION] 6.6: the response schema gains an optional `confidence` number. It is not required, and the prompt text is unchanged. Drafts store `confidence` and `needs_confirmation`, and a draft is flagged "Please double-check" when its confidence is under 0.75 (the receipt threshold in 6.12) or when its category fell back to `top`.
 - [DEVIATION] 6.12: `Receipts::TextParser` fixes three bugs of the original (approved in Step 8). Specs pin each fix:
@@ -292,6 +299,14 @@ Each fix has a regression spec that fails on the old code, unless stated.
   - Development and test keep the `changeme` default from `.env.example`.
 
 ### Other changes to Phase 1 files
+
+- **ADC support in `Ai::GoogleToken`** (`app/services/ai/google_token.rb`; [DEVIATION] 3.4 in section 5; approved 2026-10-22).
+  - **Deployment:** with `GOOGLE_SERVICE_ACCOUNT_JSON` set and nonblank, it builds the same `ServiceAccountCredentials` with the same `cloud-platform` scope, and caches the token the same way.
+  - **Local:** with the variable absent or blank (empty or whitespace), it falls back to Application Default Credentials.
+  - **Errors:** a failure raises the new `Ai::GoogleToken::CredentialsError` in three cases: an invalid key, no ADC found, or a refused token request such as an expired `gcloud` login. The message names only the credential source and the error class; it never contains the token, the key or the original message (a JSON parse error can quote the key), and the original exception is not attached. Nothing is printed or logged.
+  - **`GoogleToken.source`** reports "service account" or "application default credentials" for diagnostics.
+  - **Error-type change:** previously a missing or invalid key raised the raw parse error. Jobs still treat the new error as a failure.
+  - **Tests:** `spec/services/ai/google_token_spec.rb` grew from 1 to 17 examples, all with mocked credentials or a locally generated key and no network. The service-account examples pass on the original code, except the one for the new `source` method.
 
 - `config/brakeman.ignore`: one entry, the Rails 8.0 pending-EOL warning (fingerprint `98b26f60…22db42`). Every other check stays on. **Rails must be upgraded before 2026-11-07**: on that date the warning changes code and fingerprint, and CI fails again until Rails is upgraded.
 - Cucumber always uses the fake AI adapter (`features/support/ai_fake.rb`), and `ENV` is restored after each scenario (`features/support/env_sandbox.rb`).
@@ -405,6 +420,7 @@ No new config vars were introduced. Phase 2 reads these, all already listed in 9
 | `HEIC_SUPPORTED` | no | `true` | photo and receipt uploads. Set `false` if the Heroku HEIC check (9.2) fails |
 | `AI_IMAGE_GEN_ENABLED`, `AI_DAILY_IMAGE_LIMIT`, `AI_DAILY_VISION_LIMIT`, `AI_DAILY_BUDGET_CENTS` | Phase 1 | Phase 1 | kill switch and quotas, honored by every Phase 2 AI job |
 | `GCS_BUCKET`, `GOOGLE_*`, `VERTEX_*`, `IMAGEN_MODEL`, `AI_ADAPTER` | Phase 1 | Phase 1 | AI and storage |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | yes for deployment (Vertex and GCS) | none | Vertex: when absent or blank, `Ai::GoogleToken` falls back to Application Default Credentials (local development, section 5). GCS still needs it. |
 | `DEMO_PASSWORD` | yes, to create the demo account in production | none in production (the account is skipped); `changeme` in development and test | `db/seeds/demo_user.rb`. Production rejects known passwords and anything under 12 characters |
 | `IMAGE_GEN_SPACING_SEC` | no | `1.5` | **not used** (section 6) |
 | `SEARCH_RERANK_ENABLED`, `RECEIPT_LLM_CLEANUP` | no | `false` | **not used**: stretch features not built (section 4) |
@@ -457,26 +473,85 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 - `Timeout` interrupts the request thread at an arbitrary point. That is acceptable because pdf-reader holds no locks or connections, but the block must stay free of database work.
 - A PDF can hold one Puma thread for up to about 5 seconds. Rack::Attack limits receipt uploads per user.
 
+**Google credentials**
+- `Ai::GoogleToken` caches one token without recording which credential source issued it. If `GOOGLE_SERVICE_ACCOUNT_JSON` or the ADC login changes while a process is running, the old token stays in use until it nears expiry (refreshed 60 seconds early; tokens last about an hour), until `Ai::GoogleToken.reset!`, or until a restart. Restart `bin/dev` or the console after changing credentials. Production is not affected, because config var changes restart the dynos.
+- With user ADC, `GoogleToken` sends only the bearer token, not the `x-goog-user-project` header. If Vertex answers 403 asking for a quota project, run `gcloud auth application-default set-quota-project <project>`; if that is not enough, the header has to be sent, which is a code change.
+- Under ADC the account needs `roles/aiplatform.user` (or Owner or Editor) and the Vertex AI API enabled. When no credentials exist at all, googleauth probes the metadata server before failing, so the error can take a few seconds.
+
 **Unverified in production**
-- Real Gemini output against the Phase 2 schemas (including `confidence`), Imagen output, SerpAPI response shapes, real image hosts, GCS blob handling, HEIC support on Heroku and dyno memory under real photos have not been tested (section 14).
+- Real Gemini output against the Phase 2 schemas (including `confidence`), Imagen output, GCS blob handling, HEIC support on Heroku and dyno memory under real photos have not been tested (section 14).
 
 **Demo**
 - The demo images are silhouettes, not photos (section 5).
 
 ## 14. Integration tests that need real credentials
 
-**None of these has been run.** Each is still open; no result has been recorded or assumed.
+Checks 1 and 2 have been run, locally (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
 
 | # | Check | Needs | Status |
 |---|---|---|---|
-| 1 | SerpAPI search: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use, and the thumbnail hosts are covered by the CSP | `SERPAPI_KEY` | Not run |
-| 2 | `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher` (redirects, content types, sizes) | network on Heroku | Not run |
+| 1 | SerpAPI search: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use, and the thumbnail hosts are covered by the CSP | `SERPAPI_KEY` | **Passed locally** (2026-10-21, one request); page-2 backfill not triggered |
+| 2 | `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher` (redirects, content types, sizes) | network | **Passed locally** (2026-10-21, one download); Active Storage on local disk, so GCS is untested (check 6) |
 | 3 | Vertex `garment_extraction` with the 6.6 schema plus `confidence`, on real outfit photos, including HEIC from a phone | Vertex credentials | Not run |
 | 4 | Vertex `receipt_extraction` with the 6.12 schema on receipt photos and screenshots; real retailer PDF receipts through `pdf-reader` | Vertex credentials, sample receipts | Not run |
 | 5 | Imagen `garment_image` for garments and drafts, including the content-blocked fallback | Vertex credentials | Not run |
 | 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | Not run |
 | 7 | Second GCP billing check (3.4 step 6) | GCP console | Not run |
 | 8 | Heroku: all four intake paths at 390 px with real AI, and no R14 memory errors | Heroku app plus 1 to 7 | Not run |
+
+### Check 1: SerpAPI search (local, 2026-10-21)
+
+- **Path tested:** the public `Wardrobe::Search::ImageSearch.call(query: "Nike white t-shirt", color: "White", kind: "T-shirt", limit: 8)`, from `bin/rails runner`.
+  - The AI adapter was `fake`.
+  - The result cache was replaced with a null store for that process only, so the request was real.
+  - Instrumentation was in-process and changed no code. It counted the requests, recorded each status, and would have refused a third request.
+- **Requests:** 1 SerpAPI request (up to 2 were approved). The page-2 backfill was not needed.
+- **Response:** HTTP 200 in about 6.3 seconds, with `search_metadata.status` "Success" and no `error`.
+- **Results:** 99 raw `images_results`. All 99 passed URL screening (http(s) only, no `data:`, no `api_key`) and dedupe. FilterAndRank kept 8, and 8 were returned.
+- **Structure:**
+  - Every result has exactly `image_url`, `thumbnail_url`, `title` and `source_url`.
+  - `image_url`: 8 of 8 are https with a host and no credentials.
+  - `thumbnail_url`: 8 of 8 are https on `encrypted-tbn0.gstatic.com`, which is in `config.x.search_thumbnail_hosts`, so the CSP allows them.
+  - `source_url`: 8 of 8 are valid retailer pages.
+  - The response shape matches the fixtures' assumptions.
+- **Errors and leaks:**
+  - No `Wardrobe::Search::Error`, no parsing errors, no exceptions.
+  - The key did not appear in any result or in any printed output: no request URLs, params or raw bodies were printed.
+- **Observations, not changed (for later decision):**
+  - The 6.3-second response is close to the 8-second `READ_TIMEOUT`.
+  - SerpAPI ignored `num=8` and returned 99, so the backfill will rarely run.
+  - The top result was a long-sleeve top for kind "T-shirt".
+  - Results 6 to 8 share one title and retailer page, with different image URLs (dedupe is by image URL).
+- **Not covered by this run:** real image import. That was tested separately as check 2, below.
+
+### Check 2: real image import (local, 2026-10-21)
+
+- **Path tested:** the app's own pipeline, `Wardrobe::Search::AddResult.call` -> `Wardrobe::ImportRemoteImageJob` -> `Media::SafeFetcher` -> `Media::ImageNormalizer` -> Active Storage, from `bin/rails runner`.
+  - `AI_ADAPTER=fake`, with a null cache store.
+  - Active Job used the `:test` adapter in that process only. The one queued `ImportRemoteImageJob` was captured and run exactly once with `ActiveJob::Base.execute`, and any retry would have been recorded, never run.
+  - Instrumentation was in-process and changed no code. It capped the run at 1 SerpAPI request and 1 image fetch, and counted TCP connections, request hops and DNS answers.
+- **Search:** 1 SerpAPI request (the same query as check 1), HTTP 200, 99 raw results, 8 returned. The picked result was rank 1, from `media.jdsports.com`.
+- **Download:**
+  - 1 real image download from `media.jdsports.com`, over https;
+  - 1 request hop, 0 redirects, 1 TCP connection;
+  - the host resolved to a public address only (`23.207.14.179`);
+  - 0 retries queued or run.
+- **Original image:** JPEG (detected from the bytes), 2000×2000, 219,875 bytes, within the 10 MB limit.
+- **Processed image:**
+  - JPEG, 512×512, 57,822 bytes, attached to the garment, with its file stored;
+  - the `thumb` (256×256) and `card` (512×512) variants processed successfully.
+- **Garment:** created `pending` (source `search`, category `top`) and moved to `ready` once the image was attached.
+- **SSRF and validation checks** (offline, before the download; 0 TCP connections opened). Each was refused with `UnsafeUrlError`:
+  - `127.0.0.1`, `10.0.0.1` and `169.254.169.254`, refused as private addresses before any connection;
+  - `metadata.google.internal`, refused as a blocked host before any DNS lookup;
+  - a non-default port and credentials in the URL, refused before DNS;
+  - a `file://` URL.
+
+  Non-image bytes were refused with `InvalidImageError`.
+- **Result:** all 27 checks passed.
+- **Cleanup:** every temporary record and file was removed: the throwaway test user and its profile, 1 garment, 3 blobs, 3 attachments, 2 variant records and 3 files on disk. This was verified by each record's ID and each file's path, and the global counts matched the starting numbers. No existing user or garment was touched.
+- **Storage:** Active Storage used the local Disk service (`storage/`). **GCS uploads and variants remain untested** (check 6).
+- **Observation:** the imported image was the search's rank-1 result, the "Long-Sleeve Top" for kind "T-shirt" noted under check 1. This is the existing ranking-quality observation; the import itself behaved correctly.
 
 ## 15. How to verify
 
