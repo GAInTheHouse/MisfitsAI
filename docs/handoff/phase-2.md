@@ -568,10 +568,10 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
   - **Rejected or malformed responses** (safety blocks, text-only answers, invalid image data) are recorded at 0¢ but may still be charged by the provider.
   - **The global budget uses this estimate.** With `AI_DAILY_BUDGET_CENTS=1000`, image generation alone stops at about 250 images a day across the app (500 at the old 2.0), sharing the budget with photo and receipt analysis. The 40-image daily cap allows up to 160¢ per user per day. A photo intake's up to 6 draft images are about 24¢.
   - The cost of `garment_image` does not depend on the model, so an Imagen model, if configured, would also be estimated at 4.0¢ (an overestimate).
-- **Model shutdown dates differ by platform:** the Gemini Developer API pricing page says `gemini-2.5-flash-image` "will be shut down on October 2, 2026" on that API. The Vertex model page gives a retirement date of March 15, 2027, and the Vertex model metadata shows it as GA. We call Vertex. The first real request (check 5) will show whether it is still served; a 404 would mean moving `GARMENT_IMAGE_MODEL` to a newer model, a configuration change.
+- **Model shutdown dates differ by platform:** the Gemini Developer API pricing page says `gemini-2.5-flash-image` "will be shut down on October 2, 2026" on that API. The Vertex model page gives a retirement date of March 15, 2027, and the Vertex model metadata shows it as GA. We call Vertex. The first real request (check 5) will show whether it is still served; a 404 would mean moving `GARMENT_IMAGE_MODEL` to a newer model, a configuration change. Check 5 confirmed that the model was callable on Vertex on 2026-10-22.
 - **Model lifetime:** `gemini-2.5-flash-image` is scheduled to retire on March 15, 2027 (model page). Plan a move to a newer Gemini image model before then; `GARMENT_IMAGE_MODEL` makes that a configuration change, as long as the request shape stays compatible.
 - **Text-only refusals:** a prompt the model refuses usually returns text with `finishReason: STOP` and no structured safety signal, so the garment ends `failed` with "Retry image", not with the placeholder.
-- **Not tested against the real API yet:** check 5 stays BLOCKED. The output size (expected 1024×1024 for 1:1) and the MIME type are unverified, and the forum reports of false `IMAGE_SAFETY` blocks on harmless clothing are unconfirmed for our prompts.
+- **Real API, tested once:** check 5 passed locally on 2026-10-22 (one request): 1024×1024 PNG output, 1,290 image tokens, `finishReason STOP`, plus an extra text part. Real-world safety filtering is still untested, and the forum reports of false `IMAGE_SAFETY` blocks on harmless clothing are unconfirmed for our prompts.
 - **Kill switch:** `AI_IMAGE_GEN_ENABLED=false` (inspected, not changed):
   - image jobs raise `Ai::DisabledError` before any request and write no row;
   - `GenerateGarmentImageJob` sets the garment to `placeholder`;
@@ -602,7 +602,7 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 
 ## 14. Integration tests that need real credentials
 
-Checks 1, 2, 3 and 4 have been run, locally, and passed; check 5 was run once and is blocked (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
+**Checks 1–5: PASSED locally. Check 6 (GCS): NOT RUN.** Check 5 passed with the Gemini implementation, after its first attempt against the configured Imagen model was blocked (HTTP 404) and garment images were migrated to Gemini (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
 
 | # | Check | Needs | Status |
 |---|---|---|---|
@@ -610,8 +610,8 @@ Checks 1, 2, 3 and 4 have been run, locally, and passed; check 5 was run once an
 | 2 | `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher` (redirects, content types, sizes) | network | **Passed locally** (2026-10-21, one download); Active Storage on local disk, so GCS is untested (check 6) |
 | 3 | Vertex `garment_extraction` with the 6.6 schema plus `confidence`, on real outfit photos, including HEIC from a phone | Vertex credentials | **Passed locally** (2026-10-22, one real product photo, local ADC); HEIC from a phone and further photos not yet tested |
 | 4 | Vertex `receipt_extraction` with the 6.12 schema on receipt photos and screenshots; real retailer PDF receipts through `pdf-reader` | Vertex credentials, sample receipts | **Passed locally** (2026-10-22, one synthetic receipt image, local ADC); real receipt photos and retailer PDFs not yet tested |
-| 5 | Imagen `garment_image` for garments and drafts, including the content-blocked fallback | Vertex credentials | **BLOCKED** — configured Imagen model unavailable (HTTP 404) (2026-10-22) |
-| 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | Not run |
+| 5 | Garment image generation (Imagen → Gemini) for garments and drafts, including the content-blocked fallback | Vertex credentials | **PASSED locally** — Gemini image generation (2026-10-22). The original Imagen implementation was blocked (HTTP 404); passed after the migration to `gemini-2.5-flash-image` |
+| 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | **NOT RUN** |
 | 7 | Second GCP billing check (3.4 step 6) | GCP console | Not run |
 | 8 | Heroku: all four intake paths at 390 px with real AI, and no R14 memory errors | Heroku app plus 1 to 7 | Not run |
 
@@ -774,7 +774,16 @@ There was no job and no retry. In-process instrumentation capped the run at one 
 1. Check 5: real Imagen garment image generation.
 2. Check 6: Google Cloud Storage integration.
 
-### Check 5: real Imagen garment image generation (BLOCKED — configured Imagen model unavailable (HTTP 404), 2026-10-22)
+### Check 5: real garment image generation (PASSED locally — Gemini image generation, 2026-10-22)
+
+Check 5 ran twice:
+1. **Attempt 1**, against the configured Imagen model, was **blocked**: the model returned HTTP 404.
+2. Garment image generation was then migrated to `gemini-2.5-flash-image` (commit `483c38d`).
+3. **Attempt 2**, with the migrated Gemini implementation, **passed locally**.
+
+Both attempts are recorded below.
+
+#### Attempt 1: Imagen (BLOCKED — configured Imagen model unavailable (HTTP 404))
 
 **Environment**
 - Project `misfitai-512403`, region `us-central1`, model `imagen-4.0-fast-generate-001` (the configured `IMAGEN_MODEL`).
@@ -812,7 +821,48 @@ There was no job and no retry. In-process instrumentation capped the run at one 
 - The preview's second strategy (`OUTFIT_GEMINI_IMAGE_MODEL=gemini-2.5-flash-image`, `generate_image_multimodal`) uses a model that is listed as GA.
 - Phase 4 should plan for this before building on Imagen.
 
-**Migration (2026-10-22):** garment images were moved to a Gemini image model (`GARMENT_IMAGE_MODEL`, default `gemini-2.5-flash-image`; section 5 [DEVIATION] and section 7). It is tested with stubbed HTTP only. **Check 5 stays BLOCKED** until one real request with the new implementation succeeds.
+**Migration (2026-10-22, commit `483c38d`):** garment images were moved to a Gemini image model (`GARMENT_IMAGE_MODEL`, default `gemini-2.5-flash-image`; section 5 [DEVIATION] and section 7). It was tested first with stubbed HTTP, then with one real request (attempt 2).
+
+#### Attempt 2: Gemini (PASSED locally — Gemini image generation, 2026-10-22)
+
+**Environment**
+- Project `misfitai-512403`, region `us-central1`, model `gemini-2.5-flash-image` (the `GARMENT_IMAGE_MODEL` default), local ADC.
+- `AI_ADAPTER=vertex` and `GOOGLE_CLOUD_PROJECT=misfitai-512403` were set only in the environment of the one test process (`bin/rails runner`). `.env` is unchanged, with `AI_ADAPTER=fake`.
+
+**Execution**
+- Exactly one real generation request, through the existing `Ai::Client.current.generate_image(kind: :garment_image, prompt:, user: nil)` from commit `483c38d`, including its image validation and pricing.
+- The prompt was the existing 6.4 garment prompt from `Wardrobe::Prompts.garment_image`, for an unsaved `Garment.new(name: "Plain White T-Shirt", category: "top", color_primary: "white", material: "cotton")` (357 characters).
+- `POST .../publishers/google/models/gemini-2.5-flash-image:generateContent`: **HTTP 200** in about **6,087 ms** (`ai_calls.latency_ms` 6,119), **`finishReason: STOP`**, no `promptFeedback`.
+- No retries, no model switch, no background jobs. In-process instrumentation capped the run at one request and printed no token, credentials or base64 data.
+
+**Response**
+- One candidate with **one text part** (84 characters: "Here is your professional e-commerce product photo of a plain white cotton t-shirt:"), which the adapter ignores, and **one image part** declared `image/png`.
+- **74 input tokens.** **1,309 output tokens**, of which **1,290 were image tokens** (the documented count per image) and 19 text.
+- **Original image:** passed the adapter's validation (type detected from the bytes, full decode). PNG, **1024×1024**, 3 bands (no alpha), **909,856 bytes**.
+- **Normalized** (`Media::ImageNormalizer.to_square_jpeg`, 512): JPEG, **512×512**, **26,201 bytes**.
+
+**Visual results** (from looking at both files locally)
+- A plain white crew-neck T-shirt, laid flat, centred and fully visible, with realistic cotton texture and folds.
+- A near-white seamless background with a soft shadow (mean brightness 243.8/255 at the top edge, 226.9 in the centre).
+- No model, hanger, hands, logo or text.
+- Suitable for the wardrobe's thumbnail (256 px square crop) and card views: the shading keeps the white shirt readable on the white background.
+
+**Usage and isolation**
+- One successful `ai_calls` row is kept: `kind garment_image`, `model gemini-2.5-flash-image`, `status ok`, `images_in 0`, **`images_out 1`**, **`est_cost_cents 4.0`**, no user.
+- 4.0¢ is our internal estimate. At Google's published price, the 1,290 image tokens come to about 3.87¢. GCP Billing is authoritative.
+- No garment, draft or blob changed (garments 16, drafts 0, blobs 15, before and after), no background jobs were queued (0), and nothing was deployed.
+- The original and normalized images are kept in the local scratchpad for review; they are not in the repository.
+
+**Not exercised by this test**
+- The full background job (`Wardrobe::GenerateGarmentImageJob`), including the attach under a row lock, `image_status: ready` and retries.
+- Active Storage attachment and the Turbo broadcasts.
+- Real draft-image generation (`GenerateDraftImageJob`, with the photo-intake draft prompt).
+- GCS storage (check 6).
+- Real-world safety filtering (a single benign prompt was used).
+
+**Model availability:** `gemini-2.5-flash-image` was callable on Vertex AI in `us-central1` on 2026-10-22, although the Gemini Developer API pricing page lists a shutdown date of October 2, 2026 for that API. The Vertex retirement date (March 15, 2027) still applies; plan the move to a newer model before then.
+
+**Next step:** check 6 (Google Cloud Storage), not run.
 
 **Phase 4 implications** (not implemented)
 - The avatar (`kind: :avatar_portrait`) still reads `IMAGEN_MODEL`, a discontinued Imagen model, and will get 404s until Phase 4 moves it to `GARMENT_IMAGE_MODEL`-style selection or its own Gemini model setting. `AVATAR_IMAGEN_MODEL` is still not read.
