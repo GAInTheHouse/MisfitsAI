@@ -317,7 +317,7 @@ Each fix has a regression spec that fails on the old code, unless stated.
 
 ### Other changes to Phase 1 files
 
-- **GCS credentials and keyless signing in `config/storage.yml`** (Stage A of the approved signing plan; implemented and tested offline only, not yet verified against Google Cloud; see check 6). Only the `google` service changed; `local` and `test`, and which service each environment uses (development `local`, test `test`, production `google`), are unchanged.
+- **GCS credentials and keyless signing in `config/storage.yml`** (Stage A of the approved signing plan; tested offline, then verified locally against Google Cloud after the Stage B setup; see check 6). Only the `google` service changed; `local` and `test`, and which service each environment uses (development `local`, test `test`, production `google`), are unchanged.
   - **Credentials:** a nonblank `GOOGLE_SERVICE_ACCOUNT_JSON` is used as the key, as before. A blank, whitespace-only or absent value now **omits** `credentials`, so `Google::Cloud::Storage` falls back to Application Default Credentials. Previously an absent value rendered `credentials: {}`, an empty key, and ADC was not used.
   - **Keyless signing:** a nonblank `GCS_SIGNING_SERVICE_ACCOUNT` adds `iam: true` and `gsa_email:` (the value, trimmed and quoted). Active Storage's GCS service then signs URLs by calling the IAM Credentials API's `signBlob` as that service account, authenticating with ADC. Blank or absent keeps the previous signing: the credentials' own private key.
   - **Checked against the installed gems** (activestorage 8.0.5.1, google-cloud-storage 1.62.1, googleauth 1.17.5, google-apis-iamcredentials_v1 0.28.0):
@@ -613,7 +613,7 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 
 ## 14. Integration tests that need real credentials
 
-**Checks 1–5: PASSED locally. Check 6 (GCS): PARTIAL PASS — storage operations passed locally; signed URLs blocked.** Not all six checks have fully passed. Check 5 passed with the Gemini implementation, after its first attempt against the configured Imagen model was blocked (HTTP 404) and garment images were migrated to Gemini (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
+**Checks 1–6: PASSED locally.** Check 6 passed in stages: storage operations first, with signed URLs blocked; then keyless signing was configured (Stages A and B) and a signed-URL test passed. Check 5 passed with the Gemini implementation, after its first attempt against the configured Imagen model was blocked (HTTP 404) and garment images were migrated to Gemini (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
 
 | # | Check | Needs | Status |
 |---|---|---|---|
@@ -622,7 +622,7 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 | 3 | Vertex `garment_extraction` with the 6.6 schema plus `confidence`, on real outfit photos, including HEIC from a phone | Vertex credentials | **Passed locally** (2026-10-22, one real product photo, local ADC); HEIC from a phone and further photos not yet tested |
 | 4 | Vertex `receipt_extraction` with the 6.12 schema on receipt photos and screenshots; real retailer PDF receipts through `pdf-reader` | Vertex credentials, sample receipts | **Passed locally** (2026-10-22, one synthetic receipt image, local ADC); real receipt photos and retailer PDFs not yet tested |
 | 5 | Garment image generation (Imagen → Gemini) for garments and drafts, including the content-blocked fallback | Vertex credentials | **PASSED locally** — Gemini image generation (2026-10-22). The original Imagen implementation was blocked (HTTP 404); passed after the migration to `gemini-2.5-flash-image` |
-| 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | **PARTIAL PASS** — storage operations passed locally; signed URLs blocked (2026-10-22). Variants and the blob hand-over on draft commit were not exercised |
+| 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | **PASSED locally** (2026-10-22): storage operations (18/18) and keyless signed URLs (12/12). Variants, the blob hand-over on draft commit, browser redirects and production authentication were not exercised |
 | 7 | Second GCP billing check (3.4 step 6) | GCP console | Not run |
 | 8 | Heroku: all four intake paths at 390 px with real AI, and no R14 memory errors | Heroku app plus 1 to 7 | Not run |
 
@@ -881,7 +881,15 @@ Both attempts are recorded below.
   - `gemini-2.5-flash-image` accepts at most 3 input images per prompt (model page), which may be too few for an avatar plus a full outfit. Newer Gemini image models accept more, at a higher cost.
   - Fix the missing kill-switch check in `Vertex#generate_image_multimodal` first (see "Gemini garment images" in section 13).
 
-### Check 6: Google Cloud Storage (PARTIAL PASS — storage operations passed locally; signed URLs blocked, 2026-10-22)
+### Check 6: Google Cloud Storage (PASSED locally, 2026-10-22)
+
+Check 6 passed in four parts, all on 2026-10-22, recorded in order below:
+1. **Run 1, storage operations:** 18/18 passed, but signed URLs were blocked (`SignedUrlUnavailable`). Check 6 was a PARTIAL PASS at this point.
+2. **Stage A:** the application configuration for keyless signing (commit `0479fb6`).
+3. **Stage B:** the Google Cloud setup. The first signing attempt was denied; one retry about 9 minutes after the IAM changes passed 12/12.
+4. **Overall:** check 6 is **PASSED locally**. That does **not** mean the complete production image-serving workflow is verified (see the remaining limitations at the end).
+
+#### Run 1: storage operations (PARTIAL PASS — signed URLs blocked)
 
 **Environment**
 - Date 2026-10-22; project `misfitai-512403`; bucket `misfitai-dev-images-2026`; local Application Default Credentials (`authorized_user`).
@@ -923,19 +931,60 @@ Both attempts are recorded below.
 - **No service account** exists in the project.
 - **Not exercised:** variants stored in GCS, the blob hand-over on draft commit, and the image jobs writing to GCS.
 
-**Keyless signing, Stage A: application configuration (implemented, tested offline; check 6 stays PARTIAL PASS)**
+#### Stage A: application configuration (implemented and tested offline; check 6 was still PARTIAL PASS at this point)
 - **Implemented:**
   - `config/storage.yml` omits `credentials` when `GOOGLE_SERVICE_ACCOUNT_JSON` is blank or absent, so ADC is used whether the variable is blank or missing.
   - It adds `iam: true` and `gsa_email` when the new optional `GCS_SIGNING_SERVICE_ACCOUNT` is set.
   - `.env.example` documents the variable.
   - `spec/config/storage_yml_spec.rb` covers every combination offline (section 7).
-- **Pending Google Cloud setup** (approved direction, not done; each step to be confirmed before running):
+- **Google Cloud setup, pending at the time** (approved direction; done in Stage B below):
   1. create `misfitai-dev-storage@misfitai-512403.iam.gserviceaccount.com` (no key);
   2. grant it `roles/storage.objectViewer` on `misfitai-dev-images-2026` only;
   3. grant the developer's Google account `roles/iam.serviceAccountTokenCreator` on that service account only;
   4. enable `iamcredentials.googleapis.com`.
-- **Pending verification:** one real signed URL generated with `GCS_SIGNING_SERVICE_ACCOUNT` set only for the test process, and fetched once (expect HTTP 200 and the original bytes). Until then, check 6 stays **PARTIAL PASS** and images stored in GCS cannot be displayed.
+- **Verification, pending at the time:** one real signed URL generated with `GCS_SIGNING_SERVICE_ACCOUNT` set only for the test process, and fetched once (expect HTTP 200 and the original bytes). Done in Stage B below.
 - **Production** authentication (a service-account key, keyless signing, or proxying) is still a separate deployment decision; see the both-set caveat in section 7.
+
+#### Stage B: Google Cloud configuration (2026-10-22)
+Done in project `misfitai-512403` as `mb5644@columbia.edu`. Each change was verified before the next.
+1. **Service account** `misfitai-dev-storage@misfitai-512403.iam.gserviceaccount.com` (display name "MisfitAI Development Storage"), enabled.
+   - Created **without user-managed keys**; only the automatic system-managed key exists.
+2. **`roles/storage.objectViewer`** for that service account, **scoped to bucket `misfitai-dev-images-2026` only**.
+   - Added with one `setIamPolicy` call through the Storage JSON API, carrying the policy's etag so a concurrent change could not be overwritten.
+   - The bucket went from 4 to 5 bindings; the 4 default bindings are unchanged.
+3. **`roles/iam.serviceAccountTokenCreator`** for `user:mb5644@columbia.edu`, **scoped to that service account only**. It is the only binding in the service account's policy.
+4. **IAM Credentials API** (`iamcredentials.googleapis.com`) enabled.
+- **No project-wide role grants:** the project IAM policy is unchanged (same bindings and etag), and the service account appears nowhere in it.
+- No other bucket exists, and no service-account keys were created.
+
+#### Signed-URL test (PASSED locally, 2026-10-22)
+**First attempt (failed):**
+- `blob.url` raised `PERMISSION_DENIED` on **`iam.serviceAccounts.signBlob`**, less than two minutes after the IAM changes.
+- The `ensure` cleanup removed that attempt's temporary object and blob row.
+- A read-only `tokeninfo` check showed the local ADC token belonged to `mb5644@columbia.edu`, the account holding Token Creator, so the identity was correct.
+- **No configuration or permission changes were made afterwards.**
+
+**Retry (passed):** the identical test, run once, about **nine minutes** after the IAM changes.
+- **IAM propagation delay is the likely explanation for the first failure, not a confirmed root cause.**
+
+**Setup:**
+- The app's Active Storage `:google` service as configured by `storage.yml`: `credentials` omitted (so ADC), `iam: true`, `gsa_email misfitai-dev-storage@…`.
+- `GOOGLE_CLOUD_PROJECT`, `GCS_BUCKET` and `GCS_SIGNING_SERVICE_ACCOUNT` were set only for the test process. `.env` and all configuration are unchanged.
+
+**Result: 12 of 12 checks passed.**
+- Upload of one temporary 26,201-byte JPEG under `integration-checks/` (the check 5 image); the checksum matched the source.
+- `blob.url(expires_in: 5.minutes)` made **one `signBlob` call (383 ms)** and produced a **five-minute** URL signed as `misfitai-dev-storage@…`. The URL, its signature and all credentials were never printed or recorded.
+- **One unauthenticated HTTP GET** of the signed URL: **HTTP 200 in 135 ms**, `Content-Type: image/jpeg`, `Content-Disposition: inline` with the blob's filename.
+- **26,201 bytes downloaded, identical to the original** (MD5 `vBsfpFlLxYlRjI7eVv8t3Q==`), and a valid **512×512 JPEG**.
+- **Cleanup:** `blob.purge` removed the temporary GCS object and the Active Storage blob row; nothing remains under the key. The bucket's 7-day soft delete keeps a recoverable copy.
+- **Isolation:** no unrelated cloud objects changed (0 other objects before and after), no database records changed (garments, drafts, blobs and attachments unchanged), no jobs were queued, and nothing was deployed.
+
+**Remaining limitations: still untested.** Check 6 passing locally does **not** mean the complete production image-serving workflow is verified.
+- Browser redirects through Rails (`rails_blob_path` / `rails_representation_path` to the signed GCS URL), with a real page and the CSP.
+- Image variants stored in GCS (`thumb`, `card`).
+- The draft-to-garment blob hand-over on photo-intake commit with GCS storage.
+- Production authentication and storage configuration: no production bucket or runtime identity yet. Heroku has no ADC, and keyless signing there would need its own credential; see section 7.
+- Keyless signing makes one IAM `signBlob` call per image URL, which adds latency per redirect. This is acceptable for local development and is a consideration for production.
 
 ## 15. How to verify
 
