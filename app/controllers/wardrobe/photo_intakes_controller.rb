@@ -4,6 +4,8 @@ module Wardrobe
   # Photo AI (design doc 6.6): upload an outfit photo, then review the detected garments.
   # Views render inside the "photo_intake" Turbo Frame of the wardrobe page (and stand alone without JS).
   class PhotoIntakesController < ApplicationController
+    include IntakeUpload
+
     MAX_BYTES = 15.megabytes
     EMPTY = "Uploaded file is empty"
     TOO_LARGE = "Image too large"
@@ -20,10 +22,9 @@ module Wardrobe
       error = upload_error(upload)
       return render_new_error(error) if error
 
-      batch = current_user.intake_batches.create!(kind: "photo", status: "processing")
       upload.rewind
-      batch.source_file.attach(upload) # Active Storage identifies the content type from the bytes
-      Wardrobe::ExtractGarmentsJob.perform_later(batch.id)
+      # Stored first, then queued (IntakeUpload); Active Storage identifies the content type from the bytes.
+      batch = create_upload_batch(file: upload, job: Wardrobe::ExtractGarmentsJob, kind: "photo")
       redirect_to wardrobe_photo_intake_path(batch)
     end
 

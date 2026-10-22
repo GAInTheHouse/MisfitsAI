@@ -15,7 +15,8 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 | 5. AI image generation and bulk garment creation | Done (approved) |
 | 6. Garment image search and remote image import | Done (approved) |
 | 7. AI photo intake | Done (approved) |
-| 8. Receipt parsing and intake | In review |
+| 8. Receipt parsing and intake | Done (approved) |
+| 9. Security, authorization and reliability review | In review |
 
 ## Shipped
 
@@ -81,6 +82,8 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
   - Reused from photo intake: `IntakeBatch`/`GarmentDraft`, `IntakeBatchesController#commit`/`destroy` (now branching on kind), `Wardrobe::DraftEdits` (shared edit step, photo commit refactored onto it), `IntakeBatchJobSupport` (shared failure/purge/broadcast for intake jobs, `ExtractGarmentsJob` refactored onto it), `ImagePreparer` (with `max_side:`), the `wardrobe--draft-selection` Stimulus controller.
   - Specs: text parser, PDF text, vision parser, commit, image job, request spec `spec/requests/wardrobe/receipts_spec.rb`, authorization cases.
   - Activated all 8 `receipts.feature` scenarios still `@wip` and added "Add receipt items from the wardrobe's Receipt tab" (`@javascript`). No `@wip` scenarios remain in Phase 2.
+
+- Security and reliability review (Step 9): see "Step 9 review" below; regressions in `spec/requests/phase2_security_spec.rb` and `spec/requests/rate_limits_spec.rb`.
 
 ## Not done / deferred
 
@@ -206,7 +209,6 @@ Planned, not yet made (to be confirmed in their steps):
 
 - Rails 8.0 end of life on 2026-11-07 (see above).
 - `spec/factories/users.rb` `:user_profile` factory always fails: it builds a user, whose `after_create` already creates the profile, then saves a second one (unique index on `user_profiles.user_id`). Found by `FactoryBot.lint`; the Phase 2 lint is scoped to Phase 2 factories until it is fixed.
-- Rack::Attack has no 60-per-hour per-user limit on AI POSTs (4.4).
 - `ApplicationJob` has no default queue or retry/discard policy.
 - `AVATAR_IMAGEN_MODEL` is not read; avatars use `IMAGEN_MODEL` (Phase 4 concern).
 - `APP_HOST` is not read (OmniAuth `full_host`, mailer host is hardcoded to `example.com`).
@@ -230,9 +232,31 @@ Planned, not yet made (to be confirmed in their steps):
 - `Timeout` interrupts the request thread at an arbitrary point. That is acceptable here (pdf-reader works on an in-memory copy and holds no locks or connections), but the block must stay free of database work.
 - A PDF still costs up to ~5 seconds of one Puma thread; Rack::Attack limits receipt uploads per user.
 
-## Rate limits still to do
+## Step 9 review
 
-- G10: the hourly per-user limit for AI POSTs (4.4: 60 per hour) is not added yet; planned for the hardening step.
+Fixed (each with a regression spec that fails on the old code):
+1. Unauthenticated Active Storage direct uploads: `POST /rails/active_storage/direct_uploads` (routed by Rails, no sign-in) created blobs and returned signed upload URLs to the bucket. The app never uses direct uploads; `config/routes.rb` now answers 404. Blob redirect and representation routes are unchanged.
+2. Pasted receipt text was written to the request logs; `receipt_text` is now in `filter_parameters`.
+3. Fixed on behalf of Phase 1: `Ai::Client::Fake#generate_json` and `#generate_text` skipped the quota checks Vertex performs, so the daily vision cap and global budget for photo and receipt analysis were never tested (3.7: the fake exists so "the budget logic gets tested too"). They now call `check_quotas!` like Vertex.
+4. G10: hourly per-user limits of 60 (4.4), for the AI posts (`/wardrobe/photo_intakes`, `/wardrobe/receipts`, `/avatar`, `/outfit_previews`) and, separately, for searches. `/outfit_previews` is the 7.1 route of the doc's `/outfits/*/preview`.
+5. `ExtractGarmentsJob` committed drafts and the batch's `ready` status in separate transactions; a worker dying in between (Solid Queue re-runs claimed jobs of dead processes) would add the drafts again. Now one transaction under the batch lock, skipped if the batch is finished. `Receipts::Intake.finish` has the same guard.
+6. The intake failure handler re-inserted rolled-back drafts: drafts created through `@batch.garment_drafts` stay in the association after a rollback, and `mark_failed!` saved them again. `IntakeBatchJobSupport#fail_batch` now reloads the batch first.
+7. Photo and receipt-image uploads created the batch, attached the file and queued the job in three unguarded steps; a storage failure left a `processing` batch with no file or job. Now `IntakeUpload#create_upload_batch` (controller concern): save the batch, attach the file outside any transaction (Active Storage stores it in an after-commit callback, so it is stored when `attach` returns), then queue the job; if attaching or queueing fails, the stored file is purged and the batch removed. A first attempt wrapped all three in one transaction; that let a Solid Queue worker pick up the job at commit while the request was still uploading the file to GCS, so the job could fail the batch as unreadable. A spec checks the file is stored when the job is queued (fails on the transaction version) and that a queueing failure leaves no batch, blob row or stored file. A rolled-back transaction never stores a file (verified), so no orphaned objects come from rollbacks. `Receipts::Intake.from_text` (no file) creates the batch and its drafts in one transaction.
+9. Action Cable had no connection authentication, so a stream name copied from a page (permanent, never revoked, and carrying receipt rows in broadcasts) worked without signing in and after sign-out. `ApplicationCable::Connection` now requires the Warden session's user, and `UserStreamAuthorization` (prepended to `Turbo::StreamsChannel` in `config/initializers/turbo_stream_authorization.rb`) accepts a subscription only when the stream's first part is that user. Phases 3 and 4 must keep streams user-first (`[user, :planner]`, `[user, :avatar]`), as 2.4 specifies. Specs in `spec/channels/cable_authorization_spec.rb`; all browser scenarios pass over the authenticated socket.
+8. `ExtractGarmentsJob` and `Receipts::ParseImageJob` allow one run per batch (`limits_concurrency`).
+
+Verified, no change needed (with specs):
+- Authorization sweep: every Phase 2 member route (garments, photo batches, drafts, receipts, commit, discard) returns 404 for another user and changes nothing; uploaded source files are never linked from any page; jobs act only on the records their ids name and derive the user from them.
+- CSRF: forms rendered by broadcasts carry the renderer's token, but Turbo sends the page's token in `X-CSRF-Token`, which Rails accepts; a forged token without the header is still rejected (checked with forgery protection on).
+- Non-UUID draft ids in review edits are ignored.
+- Blocking `/rails/active_storage/direct_uploads` breaks nothing: no form or script uses direct uploads (no `direct_upload:` option, no Active Storage JS pinned); every upload is a normal multipart post. A spec checks the upload forms.
+- Earlier steps already cover SSRF (Step 6), upload validation and memory (Step 7), PDF bounds (Step 8), job retries, idempotency and duplicate-call guards (Steps 5 to 8).
+
+## Residual risks (accepted, for deployment)
+
+- Active Storage blob and representation URLs are signed but do not expire, so anyone holding a garment or draft image link can open it (the redirect goes to a 1-hour signed storage URL). Images are product photos; uploaded source photos and receipts are never linked.
+- Quota checks read today's `ai_calls` before calling, so parallel jobs for one user can go slightly over a cap.
+- A pasted receipt's text stays in `extracted_text_preview` (600 characters) and in drafts until the batch is purged (24 hours after last activity), visible only to its owner.
 
 ## Schema changes after Phase 1
 

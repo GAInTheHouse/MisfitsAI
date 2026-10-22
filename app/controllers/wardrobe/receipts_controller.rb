@@ -5,6 +5,8 @@ module Wardrobe
   # image is read by Receipts::ParseImageJob. Views render inside the "receipt_intake" Turbo Frame of the
   # wardrobe page (and stand alone without JS).
   class ReceiptsController < ApplicationController
+    include IntakeUpload
+
     MAX_BYTES = 10.megabytes
     MAX_TEXT = 20_000 # characters of pasted text; a receipt or order email fits easily
     IMAGE_TYPES = %w[image/jpeg image/png image/webp image/heic].freeze
@@ -69,11 +71,9 @@ module Wardrobe
       render_new_error(e.user_message)
     end
 
+    # Stored first, then queued (IntakeUpload), like photo uploads.
     def image_batch(file)
-      batch = current_user.intake_batches.create!(kind: "receipt", status: "processing", parser_strategy: "image_vision")
-      batch.source_file.attach(file)
-      Receipts::ParseImageJob.perform_later(batch.id)
-      batch
+      create_upload_batch(file: file, job: Receipts::ParseImageJob, kind: "receipt", parser_strategy: "image_vision")
     end
 
     def heic_allowed?(type)

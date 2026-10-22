@@ -9,6 +9,9 @@ module Wardrobe
 
     queue_as :ai_text
 
+    # One run per batch at a time (Solid Queue): a duplicate enqueue cannot analyze the same photo twice.
+    limits_concurrency key: ->(batch_id) { "intake-batch-#{batch_id}" }, to: 1, duration: 10.minutes
+
     ANALYZE_FAILED = "We couldn't analyze that photo right now. Please try again."
     PROCESSING_FAILED = ANALYZE_FAILED # used by IntakeBatchJobSupport's catch-all
     NO_GARMENTS = "No garments detected from image. Please upload a clearer outfit photo."
@@ -46,7 +49,7 @@ module Wardrobe
       return fail_batch(NO_GARMENTS) if items.empty?
 
       drafts = create_drafts(items)
-      @batch.update!(status: "ready", progress: DRAFTS_READY_PROGRESS, error: nil)
+      return if drafts.nil? # another run already finished this batch
       purge_source
       broadcast_batch
       ActiveRecord.after_all_transactions_commit do
@@ -56,11 +59,18 @@ module Wardrobe
 
     private
 
+    # Drafts and the "ready" status are committed together, under the batch lock: a run that dies in between
+    # leaves nothing half-done, and a rerun (retry, or Solid Queue re-running a crashed worker's job) finds
+    # the batch finished instead of adding the drafts a second time. Returns nil in that case.
     def create_drafts(items)
-      GarmentDraft.transaction do
-        items.each_with_index.map do |attrs, index|
+      @batch.with_lock do
+        next nil if @batch.finished?
+
+        drafts = items.each_with_index.map do |attrs, index|
           @batch.garment_drafts.create!(user: @batch.user, attrs: attrs, position: index, status: "pending")
         end
+        @batch.update!(status: "ready", progress: DRAFTS_READY_PROGRESS, error: nil)
+        drafts
       end
     end
 

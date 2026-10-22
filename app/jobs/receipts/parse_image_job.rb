@@ -8,6 +8,9 @@ module Receipts
 
     queue_as :ai_text
 
+    # One run per batch at a time (Solid Queue): a duplicate enqueue cannot read the same receipt twice.
+    limits_concurrency key: ->(batch_id) { "intake-batch-#{batch_id}" }, to: 1, duration: 10.minutes
+
     READ_FAILED = "We couldn't read that receipt right now. Please try again."
     PROCESSING_FAILED = READ_FAILED # used by IntakeBatchJobSupport's catch-all
     QUOTA_REACHED = "You've reached today's receipt reading limit. Please try again tomorrow."

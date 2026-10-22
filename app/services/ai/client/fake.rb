@@ -21,6 +21,7 @@ module Ai
       self.stubs = {}
 
       def generate_json(kind:, prompt:, schema:, images: [], system: nil, user: nil, **)
+        check_quotas!(kind, user, images.size, 0) # same guards as Vertex#post_gemini (design doc 3.5, 3.7)
         record_call(:generate_json, kind, prompt, user, images_in: images.size)
         stub = self.class.stubs[kind.to_s]
         raise stub if stub.is_a?(Exception)
@@ -32,6 +33,7 @@ module Ai
       end
 
       def generate_text(kind:, prompt:, images: [], system: nil, user: nil, **)
+        check_quotas!(kind, user, images.size, 0) # same guards as Vertex#post_gemini (design doc 3.5, 3.7)
         record_call(:generate_text, kind, prompt, user, images_in: images.size)
         stub = self.class.stubs[kind.to_s]
         raise stub if stub.is_a?(Exception)

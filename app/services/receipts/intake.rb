@@ -10,18 +10,23 @@ module Receipts
     module_function
 
     # Pasted text, a text file or a PDF: parsed in the request (6.12 "Synchronous"). Nothing is stored as a file.
+    # The batch and its drafts are created in one transaction, so a failure leaves no half-made batch.
     def from_text(user:, text:, strategy:)
       items = TextParser.call(text)
-      batch = user.intake_batches.create!(kind: "receipt", status: "processing", parser_strategy: strategy,
-                                          extracted_text_preview: text.to_s.strip.presence)
-      finish(batch, items)
+      IntakeBatch.transaction do
+        batch = user.intake_batches.create!(kind: "receipt", status: "processing", parser_strategy: strategy,
+                                            extracted_text_preview: text.to_s.strip.presence)
+        finish(batch, items)
+      end
     end
 
-    # Adds drafts for the parsed items and marks the batch ready, or failed when there are none.
+    # Adds drafts for the parsed items and marks the batch ready, or failed when there are none. Under the
+    # batch lock, and only once: a rerun finds the batch finished and adds nothing.
     def finish(batch, items)
-      return batch.tap { _1.mark_failed!(NO_ITEMS) } if items.empty?
+      batch.with_lock do
+        next if batch.finished?
+        next batch.mark_failed!(NO_ITEMS) if items.empty?
 
-      IntakeBatch.transaction do
         items.each_with_index do |item, index|
           # A row that names no garment (a priced line like "Gift wrap $5") starts unselected.
           batch.garment_drafts.create!(user: batch.user, status: "ready", position: index, attrs: draft_attrs(item),

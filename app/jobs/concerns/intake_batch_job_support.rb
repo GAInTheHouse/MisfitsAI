@@ -19,11 +19,14 @@ module IntakeBatchJobSupport
 
   private
 
+  # Always works on a freshly loaded batch. The failure may come from a rolled-back transaction that created
+  # drafts through @batch.garment_drafts; those objects are unsaved again but still in @batch's association, and
+  # saving @batch would insert them again.
   def fail_batch(message)
-    batch = @batch ||= IntakeBatch.find_by(id: arguments.first)
-    return unless batch
+    @batch = IntakeBatch.find_by(id: arguments.first)
+    return unless @batch
 
-    batch.mark_failed!(message)
+    @batch.mark_failed!(message)
     purge_source
     broadcast_batch
   end

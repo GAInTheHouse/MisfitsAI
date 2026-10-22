@@ -60,6 +60,45 @@ RSpec.describe "Rate limits", type: :request do
     expect(response).to redirect_to(wardrobe_path)
   end
 
+  describe "hourly limit (G10, design doc 4.4: 60 per hour per user)" do
+    # 10 requests a minute for six minutes stays under the per-minute limit and reaches 60 in the hour.
+    def sixty_spread_over_six_minutes(start)
+      6.times do |minute|
+        travel_to(start + (minute * 61).seconds) do
+          10.times do
+            yield
+            expect(response).not_to have_http_status(:too_many_requests)
+          end
+        end
+      end
+    end
+
+    let(:start) { Time.zone.parse("2026-10-22 10:00") }
+
+    it "allows 60 searches an hour per user, then answers 429 until the hour is over" do
+      sixty_spread_over_six_minutes(start) { search }
+      travel_to(start + 10.minutes) do
+        search
+        expect(response).to have_http_status(:too_many_requests)
+      end
+      travel_to(start + 61.minutes) do
+        search
+        expect(response).not_to have_http_status(:too_many_requests)
+      end
+    end
+
+    it "limits photo, receipt (and later avatar) posts to 60 an hour per user, separately from search" do
+      paste = -> { post wardrobe_receipts_path, params: { receipt_text: "Linen shirt $30.00" } }
+      sixty_spread_over_six_minutes(start) { paste.call }
+      travel_to(start + 10.minutes) do
+        paste.call
+        expect(response).to have_http_status(:too_many_requests)
+        search
+        expect(response).not_to have_http_status(:too_many_requests)
+      end
+    end
+  end
+
   it "limits adding results to 30 a minute per user" do
     30.times { select_result }
     select_result
