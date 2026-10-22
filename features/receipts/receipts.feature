@@ -5,7 +5,7 @@ Feature: Add garments from a receipt
 
   # Design doc 6.12 (Receipts::TextParser, PDF, VisionParser).
   # The AI is always the fake adapter.
-  # Every scenario is @wip until Phase 2 Step 8 implements it.
+  # Scenarios stay @wip until Phase 2 Step 8 implements receipts (the tab flag works since Step 4).
 
   Background:
     Given I am signed in as an onboarded user
@@ -91,7 +91,6 @@ Feature: Add garments from a receipt
     When I upload an 11 MB receipt file
     Then I should see "File too large"
 
-  @wip
   Scenario: The Receipt tab is hidden when the feature is switched off
     Given the "receipts" feature is disabled
     When I am on the wardrobe page

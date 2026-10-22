@@ -23,4 +23,15 @@ RSpec.describe "Authorization", type: :request do
     delete garment_path(garment)
     expect(response).to have_http_status(:not_found)
   end
+
+  # Phase 2 (design doc 8.4: each phase adds a case for every route it builds).
+  it "returns 404 for retry_image" do
+    post retry_image_garment_path(garment)
+    expect(response).to have_http_status(:not_found)
+  end
+
+  it "does not show another user's garments on the wardrobe page" do
+    get wardrobe_path
+    expect(response.body).not_to include(garment.name)
+  end
 end

@@ -4,7 +4,7 @@ Feature: Add a garment manually
   So that it can be used in my outfit plans
 
   # Design doc 6.4 (Manual add, GenerateGarmentImageJob).
-  # Every scenario is @wip until Phase 2 Steps 4-5 implement it.
+  # Scenarios that need AI image generation stay @wip until Phase 2 Step 5.
 
   Background:
     Given I am signed in as an onboarded user
@@ -31,21 +31,18 @@ Feature: Add a garment manually
     And the garment "Navy Chinos" should use a placeholder image
     And no AI image generation should have been requested
 
-  @wip
   Scenario: Formality and season default to casual and all-season
     When I fill in "Name" with "Grey Hoodie"
     And I choose the category "Top"
     And I click "Add to wardrobe"
     Then the garment "Grey Hoodie" should have formality "casual" and season "all_season"
 
-  @wip
   Scenario: A name is required
     When I choose the category "Top"
     And I click "Add to wardrobe"
     Then I should see "Name can't be blank"
     And my wardrobe should be empty
 
-  @wip
   Scenario: A name longer than 80 characters is rejected
     When I fill in "Name" with a name of 81 characters
     And I choose the category "Top"
@@ -53,12 +50,22 @@ Feature: Add a garment manually
     Then I should see "Name is too long (maximum is 80 characters)"
     And my wardrobe should be empty
 
-  @wip
   Scenario: A category is required
     When I fill in "Name" with "Mystery Item"
     And I click "Add to wardrobe"
     Then I should see "Category can't be blank"
     And my wardrobe should be empty
+
+  @javascript
+  Scenario: A new garment appears without reloading the page
+    When I fill in "Name" with "Linen Shirt"
+    And I choose the category "Top"
+    And I click "Add to wardrobe"
+    Then I should see the garment "Linen Shirt"
+    And I should see "Added Linen Shirt to your wardrobe."
+    And the wardrobe count should be 1
+    And the "Name" field should be empty
+    And my wardrobe should contain "Linen Shirt"
 
   @wip
   Scenario: Image generation disabled falls back to the placeholder

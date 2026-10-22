@@ -1,0 +1,45 @@
+<%# locals: (garment:) %>
+<%# Design doc 6.4: Photo AI, Describe item (Manual / Search) and Receipt. Describe item opens first.
+    Non-default panels are rendered hidden; shared--tabs switches them. %>
+<% tabs = [] %>
+<% tabs << [ "photo_ai", "Photo AI" ] if Feature.enabled?(:photo_intake) %>
+<% tabs << [ "describe", "Describe item" ] %>
+<% tabs << [ "receipt", "Receipt" ] if Feature.enabled?(:receipts) %>
+<% default_index = tabs.index { |key, _| key == "describe" } %>
+
+<section aria-label="Add to your wardrobe" class="rounded-[var(--radius-lg)] border p-4" style="background: var(--panel-strong); border-color: var(--line);"
+         data-controller="shared--tabs" data-shared--tabs-index-value="<%= default_index %>">
+  <div role="tablist" aria-label="Ways to add garments" class="flex flex-wrap gap-2 mb-4">
+    <% tabs.each_with_index do |(key, label), index| %>
+      <button type="button" role="tab" id="add_tab_<%= key %>" aria-controls="add_panel_<%= key %>"
+              aria-selected="<%= index == default_index %>" class="tab <%= 'active' if index == default_index %>"
+              data-shared--tabs-target="tab" data-action="shared--tabs#select"><%= label %></button>
+    <% end %>
+  </div>
+
+  <% tabs.each_with_index do |(key, _label), index| %>
+    <div role="tabpanel" id="add_panel_<%= key %>" aria-labelledby="add_tab_<%= key %>" data-shared--tabs-target="panel" <%= "hidden" unless index == default_index %>>
+      <% case key %>
+      <% when "photo_ai" %>
+        <%= render "shared/empty_state", title: "Photo AI", message: "Coming soon" %>
+      <% when "receipt" %>
+        <%= render "shared/empty_state", title: "Receipt", message: "Coming soon" %>
+      <% when "describe" %>
+        <div data-controller="shared--tabs">
+          <div role="tablist" aria-label="Describe an item" class="flex gap-2 mb-4">
+            <button type="button" role="tab" id="describe_tab_manual" aria-controls="describe_panel_manual" aria-selected="true"
+                    class="tab active" data-shared--tabs-target="tab" data-action="shared--tabs#select">Manual</button>
+            <button type="button" role="tab" id="describe_tab_search" aria-controls="describe_panel_search" aria-selected="false"
+                    class="tab" data-shared--tabs-target="tab" data-action="shared--tabs#select">Search</button>
+          </div>
+          <div role="tabpanel" id="describe_panel_manual" aria-labelledby="describe_tab_manual" data-shared--tabs-target="panel">
+            <%= render "garments/form", garment: garment %>
+          </div>
+          <div role="tabpanel" id="describe_panel_search" aria-labelledby="describe_tab_search" data-shared--tabs-target="panel" hidden>
+            <%= render "shared/empty_state", title: "Search", message: "Coming soon" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</section>

@@ -102,6 +102,18 @@
     font-weight: 600;
   }
 
+  .input {
+    @apply block w-full rounded-[var(--radius-md)] border px-3 py-2 text-sm;
+    border-color: var(--line);
+    background: var(--panel-strong);
+    color: var(--ink);
+  }
+
+  .input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
   .badge {
     @apply inline-flex items-center rounded-full border px-2 py-0.5 text-xs;
     border-color: var(--line);

@@ -1,0 +1,4 @@
+<%# locals: (garment:, class: nil) %>
+<%# Contract for later phases (design doc 6.3, 10.1): one stable id per garment so image-ready broadcasts can replace it. %>
+<%= image_tag garment_image_source(garment, :thumb), id: dom_id(garment, :thumb), alt: garment.name, loading: "lazy",
+              class: local_assigns[:class], width: 256, height: 256 %>

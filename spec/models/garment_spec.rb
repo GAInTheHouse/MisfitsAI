@@ -119,6 +119,33 @@ RSpec.describe Garment do
     end
   end
 
+  describe ".outfit_ready? (design doc 6.4)" do
+    let(:user) { create(:user) }
+
+    it "is false for an empty wardrobe or a top alone" do
+      expect(user.garments.outfit_ready?).to be(false)
+      create(:garment, :top, user: user)
+      expect(user.garments.outfit_ready?).to be(false)
+    end
+
+    it "is true with a top and a bottom" do
+      create(:garment, :top, user: user)
+      create(:garment, :bottom, user: user)
+      expect(user.garments.outfit_ready?).to be(true)
+    end
+
+    it "is true with a dress" do
+      create(:garment, :dress, user: user)
+      expect(user.garments.outfit_ready?).to be(true)
+    end
+
+    it "only looks at the relation it is called on" do
+      create(:garment, :top, user: user)
+      create(:garment, :bottom) # another user's bottom
+      expect(user.garments.outfit_ready?).to be(false)
+    end
+  end
+
   describe "#tags" do
     it "is category, formality and seasonality without blanks (design doc 5.3)" do
       expect(build(:garment, category: "top", formality: "business", seasonality: nil).tags).to eq(%w[top business])

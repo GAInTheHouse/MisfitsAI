@@ -24,64 +24,68 @@ Given("the {string} feature is disabled") do |flag|
   ENV["FEATURE_#{flag.upcase}"] = "false"
 end
 
-When("I choose the category {string}") do |_category|
-  pending "Phase 2 Step 4"
+When("I choose the category {string}") do |category|
+  # Pills hide the radio (sr-only) under its label, so click the label as a person would.
+  within("#manual_garment_form") { choose(category, allow_label_click: true) }
 end
 
-When("I uncheck {string}") do |_label|
-  pending "Phase 2 Step 4"
+When("I uncheck {string}") do |label|
+  uncheck(label)
 end
 
-When("I fill in {string} with a name of {int} characters") do |_field, _length|
-  pending "Phase 2 Step 4"
+When("I fill in {string} with a name of {int} characters") do |field, length|
+  fill_in field, with: "a" * length
 end
 
-When("I filter the wardrobe by {string}") do |_category|
-  pending "Phase 2 Step 4"
+When("I filter the wardrobe by {string}") do |category|
+  within("#wardrobe_filters") { click_link(category, exact_text: true) }
 end
 
-When("I hide {string} from outfits") do |_name|
-  pending "Phase 2 Step 4"
+When("I hide {string} from outfits") do |name|
+  within(garment_card_css(name)) { click_button("Hide from outfits") }
 end
 
-When("I show {string} in outfits") do |_name|
-  pending "Phase 2 Step 4"
+When("I show {string} in outfits") do |name|
+  within(garment_card_css(name)) { click_button("Show in outfits") }
 end
 
-When("I delete {string} and confirm {string}") do |_name, _message|
-  pending "Phase 2 Step 4"
+When("I delete {string} and confirm {string}") do |name, message|
+  # Turbo's data-turbo-confirm uses the browser's confirm dialog, so this step needs @javascript.
+  accept_confirm(message) do
+    within(garment_card_css(name)) { click_button("Delete") }
+  end
 end
 
-Then("my wardrobe should contain {string}") do |_name|
-  pending "Phase 2 Step 4"
+Then("my wardrobe should contain {string}") do |name|
+  expect(Garment.where(user_id: @user.id, name: name)).to exist
 end
 
-Then("my wardrobe should not contain {string}") do |_name|
-  pending "Phase 2 Step 4"
+Then("my wardrobe should not contain {string}") do |name|
+  expect(Garment.where(user_id: @user.id, name: name)).not_to exist
 end
 
 Then("my wardrobe should be empty") do
-  pending "Phase 2 Step 4"
+  expect(Garment.where(user_id: @user.id)).not_to exist
 end
 
-Then("the wardrobe count should be {int}") do |_count|
-  pending "Phase 2 Step 4"
+Then("the wardrobe count should be {int}") do |count|
+  expect(page).to have_css("#wardrobe_count", exact_text: "#{count} #{count == 1 ? 'item' : 'items'}")
 end
 
-Then("I should see the garment {string}") do |_name|
-  pending "Phase 2 Step 4"
+Then("I should see the garment {string}") do |name|
+  expect(page).to have_css(garment_card_css(name))
 end
 
-Then("I should not see the garment {string}") do |_name|
-  pending "Phase 2 Step 4"
+Then("I should not see the garment {string}") do |name|
+  expect(page).to have_no_css(garment_card_css(name))
 end
 
-Then("the garment {string} should show the badge {string}") do |_name, _badge|
-  pending "Phase 2 Step 4"
+Then("the garment {string} should show the badge {string}") do |name, badge|
+  within(garment_card_css(name)) { expect(page).to have_css(".badge", exact_text: badge) }
 end
 
-Then("the garment {string} should not show the badge {string}") do |_name, _badge|
-  pending "Phase 2 Step 4"
+Then("the garment {string} should not show the badge {string}") do |name, badge|
+  within(garment_card_css(name)) { expect(page).to have_no_css(".badge", exact_text: badge) }
 end
 
 Then("the garment {string} should use a placeholder image") do |_name|
@@ -92,8 +96,8 @@ Then("the garment {string} should have a generated image") do |_name|
   pending "Phase 2 Step 5"
 end
 
-Then("the garment {string} should have formality {string} and season {string}") do |_name, _formality, _season|
-  pending "Phase 2 Step 4"
+Then("the garment {string} should have formality {string} and season {string}") do |name, formality, season|
+  expect(Garment.find_by!(user_id: @user.id, name: name)).to have_attributes(formality: formality, seasonality: season)
 end
 
 Then("the garment {string} should have these details:") do |_name, _table|
@@ -108,22 +112,34 @@ Then("no AI image generation should have been requested") do
   pending "Phase 2 Step 5"
 end
 
-Then("I should not see {string}") do |_text|
-  pending "Phase 2 Step 4"
+Then("the {string} field should be empty") do |label|
+  expect(page).to have_field(label, with: "")
 end
 
-Then("I should see the link {string}") do |_label|
-  pending "Phase 2 Step 4"
+Then("the current URL should include {string}") do |fragment|
+  expect(page).to have_current_path(/#{Regexp.escape(fragment)}/)
 end
 
-Then("I should not see the link {string}") do |_label|
-  pending "Phase 2 Step 4"
+Then("I should not see {string}") do |text|
+  expect(page).to have_no_content(text)
+end
+
+Then("I should see the link {string}") do |label|
+  expect(page).to have_link(label, exact_text: true)
+end
+
+Then("I should not see the link {string}") do |label|
+  expect(page).to have_no_link(label, exact_text: true)
 end
 
 Then("I should see the button {string}") do |_label|
   pending "Phase 2 Step 7"
 end
 
-Then("I should not see the tab {string}") do |_label|
-  pending "Phase 2 Step 4"
+Then("I should see the tab {string}") do |label|
+  expect(page).to have_css("[role=tab]", exact_text: label)
+end
+
+Then("I should not see the tab {string}") do |label|
+  expect(page).to have_no_css("[role=tab]", exact_text: label)
 end

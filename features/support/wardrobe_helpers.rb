@@ -15,6 +15,12 @@ module WardrobeHelpers
     # Blank cells mean "not set": drop them so column defaults (e.g. hidden = false) apply.
     attrs.compact
   end
+
+  # CSS for the wardrobe card of the garment with this exact name (garments/_garment sets data-name).
+  def garment_card_css(name)
+    escaped = name.gsub("\\", "\\\\\\\\").gsub('"', '\\"')
+    %(article.garment-card[data-name="#{escaped}"])
+  end
 end
 
 World(WardrobeHelpers)

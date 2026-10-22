@@ -29,7 +29,8 @@ class Garment < ApplicationRecord
              with: ->(value) { value.strip.presence }
 
   validates :name, presence: true, length: { maximum: NAME_MAX_LENGTH }
-  validates :category, presence: true, inclusion: { in: CATEGORIES }
+  validates :category, presence: true
+  validates :category, inclusion: { in: CATEGORIES }, allow_blank: true # one error for a blank category
   validates :source, presence: true, inclusion: { in: SOURCES }
   validates :image_status, inclusion: { in: IMAGE_STATUSES }
   validates :formality, inclusion: { in: FORMALITIES }, allow_nil: true
@@ -41,6 +42,16 @@ class Garment < ApplicationRecord
   scope :visible, -> { where(hidden_from_recommendations: false) }
   scope :by_category, ->(cat) { where(category: cat) }
   scope :recent, -> { order(created_at: :desc) }
+  # Preloads the image and its tracked variants so a grid of cards does not query per card.
+  scope :with_image_variants, -> { preload(image_attachment: { blob: { variant_records: { image_attachment: :blob } } }) }
+
+  # Design doc 6.4 / 6.7: outfit planning unlocks once there is a top and a bottom, or a dress.
+  # Call on a relation; the wardrobe page and the planner use visible garments:
+  # current_user.garments.visible.outfit_ready?
+  def self.outfit_ready?
+    categories = distinct.pluck(:category)
+    categories.include?("dress") || (%w[top bottom] - categories).empty?
+  end
 
   def tags
     [ category, formality, seasonality ].compact

@@ -1,0 +1,8 @@
+<%# locals: (category: nil) %>
+<div id="wardrobe_empty" class="col-span-full">
+  <% if category %>
+    <%= render "shared/empty_state", title: "Nothing here yet", message: "No #{garment_category_label(category).downcase} items in your wardrobe yet." %>
+  <% else %>
+    <%= render "shared/empty_state", title: "Your closet", message: "Your closet is empty. Snap a photo, search for an item, or describe it to get started." %>
+  <% end %>
+</div>

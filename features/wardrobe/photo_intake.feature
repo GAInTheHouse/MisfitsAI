@@ -5,7 +5,7 @@ Feature: Add garments from an outfit photo
 
   # Design doc 6.6 (Photo AI intake) and 12.1 (sample scenarios).
   # The AI is always the fake adapter.
-  # Every scenario is @wip until Phase 2 Step 7 implements it.
+  # Scenarios stay @wip until Phase 2 Step 7 implements photo intake (the tab flag works since Step 4).
 
   Background:
     Given I am signed in as an onboarded user
@@ -104,7 +104,6 @@ Feature: Add garments from an outfit photo
     Then I should see "Please upload a JPEG, PNG, WebP or HEIC image"
     And no AI analysis should have been requested
 
-  @wip
   Scenario: The Photo AI tab is hidden when the feature is switched off
     Given the "photo_intake" feature is disabled
     When I am on the wardrobe page

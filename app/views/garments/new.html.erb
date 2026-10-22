@@ -1,0 +1,7 @@
+<div class="space-y-4">
+  <h1 class="font-display text-3xl">Add garment</h1>
+  <%= render "shared/card" do %>
+    <%= render "garments/form", garment: @garment %>
+  <% end %>
+  <%= link_to "Back to wardrobe", wardrobe_path, class: "text-sm underline underline-offset-4" %>
+</div>

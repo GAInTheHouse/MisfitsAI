@@ -4,9 +4,7 @@ Feature: Manage my wardrobe
   So that my outfit plans only use what I want to wear
 
   # Design doc 6.4 (Wardrobe page, Hide, Delete) and 7.2 (empty states).
-  # Every scenario is @wip until Phase 2 Step 4 implements it.
 
-  @wip
   Scenario: An empty wardrobe shows the empty state and the planning hint
     Given I am signed in as an onboarded user
     When I am on the wardrobe page
@@ -14,7 +12,15 @@ Feature: Manage my wardrobe
     And I should see "Add at least one top and one bottom to unlock outfit planning."
     And I should not see the link "Next: plan your week"
 
-  @wip
+  Scenario: The add panel offers every way to add garments
+    Given I am signed in as an onboarded user
+    When I am on the wardrobe page
+    Then I should see the tab "Photo AI"
+    And I should see the tab "Describe item"
+    And I should see the tab "Receipt"
+    And I should see the tab "Manual"
+    And I should see the tab "Search"
+
   Scenario: The wardrobe lists my garments with their count
     Given I am signed in as an onboarded user
     And my wardrobe contains:
@@ -26,7 +32,6 @@ Feature: Manage my wardrobe
     And I should see the garment "White Oxford Shirt"
     And I should see the garment "Khaki Chinos"
 
-  @wip
   Scenario: Filter the wardrobe by category
     Given I am signed in as an onboarded user
     And my wardrobe contains:
@@ -43,7 +48,6 @@ Feature: Manage my wardrobe
     Then I should see the garment "White Oxford Shirt"
     And I should see the garment "Brown Loafers"
 
-  @wip
   Scenario: Hide a garment from outfits
     Given I am signed in as an onboarded user
     And my wardrobe contains:
@@ -53,7 +57,6 @@ Feature: Manage my wardrobe
     When I hide "White Oxford Shirt" from outfits
     Then the garment "White Oxford Shirt" should show the badge "Hidden from outfits"
 
-  @wip
   Scenario: Show a hidden garment in outfits again
     Given I am signed in as an onboarded user
     And my wardrobe contains:
@@ -64,7 +67,7 @@ Feature: Manage my wardrobe
     When I show "White Oxford Shirt" in outfits
     Then the garment "White Oxford Shirt" should not show the badge "Hidden from outfits"
 
-  @wip @javascript
+  @javascript
   Scenario: Delete a garment after confirming
     Given I am signed in as an onboarded user
     And my wardrobe contains:
@@ -75,7 +78,23 @@ Feature: Manage my wardrobe
     Then I should not see the garment "Khaki Chinos"
     And my wardrobe should not contain "Khaki Chinos"
 
-  @wip
+  @javascript
+  Scenario: Hiding and filtering update the page in place
+    Given I am signed in as an onboarded user
+    And my wardrobe contains:
+      | name               | category | formality    | color | size | gender | hidden | times_recommended |
+      | White Oxford Shirt | top      | business     | white | M    |        | false  | 0                 |
+      | Khaki Chinos       | bottom   | smart_casual | khaki | M    |        | false  | 0                 |
+    And I am on the wardrobe page
+    When I hide "White Oxford Shirt" from outfits
+    Then the garment "White Oxford Shirt" should show the badge "Hidden from outfits"
+    When I show "White Oxford Shirt" in outfits
+    Then the garment "White Oxford Shirt" should not show the badge "Hidden from outfits"
+    When I filter the wardrobe by "Bottom"
+    Then I should not see the garment "White Oxford Shirt"
+    And I should see the garment "Khaki Chinos"
+    And the current URL should include "category=bottom"
+
   Scenario: The next-step link appears once I own a top and a bottom
     Given I am signed in as an onboarded user
     And my wardrobe contains:
@@ -86,7 +105,6 @@ Feature: Manage my wardrobe
     Then I should see the link "Next: plan your week"
     And I should not see "Add at least one top and one bottom to unlock outfit planning."
 
-  @wip
   Scenario: The next-step link appears once I own a dress
     Given I am signed in as an onboarded user
     And my wardrobe contains:
@@ -95,7 +113,16 @@ Feature: Manage my wardrobe
     When I am on the wardrobe page
     Then I should see the link "Next: plan your week"
 
-  @wip
+  Scenario: A hidden garment does not unlock planning
+    Given I am signed in as an onboarded user
+    And my wardrobe contains:
+      | name               | category | formality    | color | size | gender | hidden | times_recommended |
+      | White Oxford Shirt | top      | business     | white | M    |        | false  | 0                 |
+      | Khaki Chinos       | bottom   | smart_casual | khaki | M    |        | true   | 0                 |
+    When I am on the wardrobe page
+    Then I should see "Add at least one top and one bottom to unlock outfit planning."
+    And I should not see the link "Next: plan your week"
+
   Scenario: A top alone does not unlock planning
     Given I am signed in as an onboarded user
     And my wardrobe contains:
