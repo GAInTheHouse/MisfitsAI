@@ -602,7 +602,7 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 
 ## 14. Integration tests that need real credentials
 
-**Checks 1–5: PASSED locally. Check 6 (GCS): NOT RUN.** Check 5 passed with the Gemini implementation, after its first attempt against the configured Imagen model was blocked (HTTP 404) and garment images were migrated to Gemini (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
+**Checks 1–5: PASSED locally. Check 6 (GCS): PARTIAL PASS — storage operations passed locally; signed URLs blocked.** Not all six checks have fully passed. Check 5 passed with the Gemini implementation, after its first attempt against the configured Imagen model was blocked (HTTP 404) and garment images were migrated to Gemini (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
 
 | # | Check | Needs | Status |
 |---|---|---|---|
@@ -611,7 +611,7 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 | 3 | Vertex `garment_extraction` with the 6.6 schema plus `confidence`, on real outfit photos, including HEIC from a phone | Vertex credentials | **Passed locally** (2026-10-22, one real product photo, local ADC); HEIC from a phone and further photos not yet tested |
 | 4 | Vertex `receipt_extraction` with the 6.12 schema on receipt photos and screenshots; real retailer PDF receipts through `pdf-reader` | Vertex credentials, sample receipts | **Passed locally** (2026-10-22, one synthetic receipt image, local ADC); real receipt photos and retailer PDFs not yet tested |
 | 5 | Garment image generation (Imagen → Gemini) for garments and drafts, including the content-blocked fallback | Vertex credentials | **PASSED locally** — Gemini image generation (2026-10-22). The original Imagen implementation was blocked (HTTP 404); passed after the migration to `gemini-2.5-flash-image` |
-| 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | **NOT RUN** |
+| 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | **PARTIAL PASS** — storage operations passed locally; signed URLs blocked (2026-10-22). Variants and the blob hand-over on draft commit were not exercised |
 | 7 | Second GCP billing check (3.4 step 6) | GCP console | Not run |
 | 8 | Heroku: all four intake paths at 390 px with real AI, and no R14 memory errors | Heroku app plus 1 to 7 | Not run |
 
@@ -869,6 +869,48 @@ Both attempts are recorded below.
 - The outfit preview's subject strategy (`generate_image_with_subject`, `OUTFIT_SUBJECT_MODEL=imagen-3.0-capability-001`) uses Imagen subject customization. That endpoint is on the discontinued list, and there is no Gemini equivalent with the same request shape. Phase 4 should use the Gemini strategy (`generate_image_multimodal`).
   - `gemini-2.5-flash-image` accepts at most 3 input images per prompt (model page), which may be too few for an avatar plus a full outfit. Newer Gemini image models accept more, at a higher cost.
   - Fix the missing kill-switch check in `Vertex#generate_image_multimodal` first (see "Gemini garment images" in section 13).
+
+### Check 6: Google Cloud Storage (PARTIAL PASS — storage operations passed locally; signed URLs blocked, 2026-10-22)
+
+**Environment**
+- Date 2026-10-22; project `misfitai-512403`; bucket `misfitai-dev-images-2026`; local Application Default Credentials (`authorized_user`).
+- The app's configured Active Storage `:google` service from `config/storage.yml`, used as is.
+- `GOOGLE_CLOUD_PROJECT=misfitai-512403` and `GCS_BUCKET=misfitai-dev-images-2026` were set only in the environment of the one test process (`bin/rails runner`).
+- `GOOGLE_SERVICE_ACCOUNT_JSON` is present but blank in `.env`, so the service's `credentials` resolved to `nil` and the client used ADC.
+- `.env` and all configuration are unchanged.
+
+**Storage operations: 18 of 18 checks passed**
+- One object under a unique key, `integration-checks/check6-20261022T050515Z-d803d77a2419.jpg`. The key was confirmed absent before the upload, and the bucket held no other objects.
+- **Upload:** one 26,201-byte JPEG (the 512×512 normalized image from check 5) through `ActiveStorage::Blob.create_and_upload!(service_name: "google")`. The blob checksum equalled the source MD5.
+- **Object metadata:** 26,201 bytes, `image/jpeg`, STANDARD class. The object's MD5 equalled the blob checksum.
+- **Full download** (`blob.download`): the bytes matched the original exactly.
+- **Partial download** (`download_chunk(key, 0..99)`): exactly the first 100 bytes.
+- **`blob.open`:** a valid 512×512 JPEG.
+- **`blob.purge`:** removed the live object (`exist?` false, nothing left under the key) and the temporary `active_storage_blobs` row.
+- **Isolation:** no unrelated objects changed (0 other objects before and after). No application records changed (garments, drafts, blobs and attachments unchanged). No background jobs were queued.
+- The `ensure` cleanup was ready to remove only the exact key and blob row; nothing was left for it.
+- **About 15 requests to GCS:**
+  - 1 upload and 1 delete;
+  - 4 existence checks, 1 metadata read, 1 full and 1 partial download, and 1 streamed download (`blob.open`: a metadata read plus one range read);
+  - 4 lists: 1 from purge's variant clean-up, 3 from the test's own checks.
+
+  The cost is negligible.
+- **Soft delete:** the bucket keeps soft-deleted objects for 7 days, so a recoverable copy of the 26 KB test object remains until about 2026-10-29. It is billed as storage for that week (negligible) and was not purged.
+
+**Signed URLs: blocked**
+- `blob.url(expires_in: 5.minutes)` failed with **`Google::Cloud::Storage::SignedUrlUnavailable`**. Signing happens locally, so no request was made, and no URL was produced or printed.
+- **Why:** the local ADC user credentials (`authorized_user`) have no private key, so they cannot sign GCS URLs. Active Storage's GCS service can sign without a key only with `iam: true` and a service account (`gsa_email`), which is not configured.
+- **Consequence:** GCS-backed images cannot currently be displayed through the app's existing redirect routes (`rails_blob_path` and `rails_representation_path` redirect to `blob.url`), so garment images stored in GCS would not render.
+- **Preferred next step:** investigate keyless IAM signing with a dedicated service account. This has not been implemented or verified.
+
+**Configuration limitations**
+- `GOOGLE_SERVICE_ACCOUNT_JSON` currently has to be **present but blank** for the ADC fallback. With the variable absent, `storage.yml` passes `credentials: {}` (an empty key), so ADC is not used.
+- `GCS_BUCKET` and `GOOGLE_CLOUD_PROJECT` were set only for the test process; both are blank in `.env`.
+- The existing development bucket `misfitai-dev-images-2026` is in **`us-east1`** (regional, uniform access, public access prevention enforced). The design doc proposes `misfit-<env>-media` in `us-central1`.
+- **Production storage is still outstanding:** no production bucket, no runtime identity, and no credentials for Heroku.
+- The **IAM Credentials API** (`iamcredentials.googleapis.com`) is currently **disabled**.
+- **No service account** exists in the project.
+- **Not exercised:** variants stored in GCS, the blob hand-over on draft commit, and the image jobs writing to GCS.
 
 ## 15. How to verify
 
