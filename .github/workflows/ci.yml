@@ -44,6 +44,9 @@ jobs:
           ruby-version: 3.3.12
           bundler-cache: true
       - uses: browser-actions/setup-chrome@v1
+      # The app and its specs process images with libvips (ruby-vips), which the runner does not ship.
+      - name: Install libvips
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - run: bin/rails db:prepare
       - run: COVERAGE=true bundle exec rspec
 
@@ -73,6 +76,9 @@ jobs:
           ruby-version: 3.3.12
           bundler-cache: true
       - uses: browser-actions/setup-chrome@v1
+      # The app and its specs process images with libvips (ruby-vips), which the runner does not ship.
+      - name: Install libvips
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - run: bin/rails db:prepare
       - run: bundle exec cucumber --format progress
       - uses: actions/upload-artifact@v4
