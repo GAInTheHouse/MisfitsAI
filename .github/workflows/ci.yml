@@ -86,9 +86,24 @@ jobs:
       # The layout links app/assets/builds/tailwind.css, a git-ignored build output (tailwindcss-rails only
       # builds it on test:prepare / assets:precompile, which CI does not run).
       - run: bin/rails tailwindcss:build
-      - run: bundle exec cucumber --format progress
+      # Diagnostics: the Chrome binaries Cuprite/Ferrum can find, in Ferrum's search order (the first found is
+      # used unless BROWSER_PATH is set).
+      - name: Show Chrome for Cuprite
+        run: |
+          echo "BROWSER_PATH=${BROWSER_PATH:-<unset>}"
+          for name in chrome google-chrome google-chrome-stable google-chrome-beta chromium chromium-browser; do
+            path="$(command -v "$name" || true)"
+            if [ -n "$path" ]; then echo "$name -> $path: $("$path" --version 2>&1 || true)"; fi
+          done
+      # Progress output stays on the console. The pretty report also records exceptions raised in Before and
+      # After hooks, which the progress formatter does not print.
+      - run: |
+          mkdir -p tmp/cucumber
+          bundle exec cucumber --format progress --format pretty --out tmp/cucumber/pretty.txt
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: capybara-screenshots
-          path: tmp/capybara
+          name: cucumber-failure-diagnostics
+          path: |
+            tmp/cucumber
+            tmp/capybara
