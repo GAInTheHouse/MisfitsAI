@@ -1,21 +1,27 @@
 # frozen_string_literal: true
 
-# Phase 2 wardrobe steps (design doc 8.3). Pending until Phase 2 Steps 2-5 implement them.
+# Phase 2 wardrobe steps (design doc 8.3). Steps still marked pending are implemented in later Phase 2 steps.
 
-Given("my wardrobe contains:") do |_table|
-  pending "Phase 2 Step 2: canonical wardrobe table (design doc 8.3)"
+# Canonical table (design doc 8.3). Columns are Garment attributes, plus the aliases in WardrobeHelpers.
+Given("my wardrobe contains:") do |table|
+  raise "Sign in before adding garments (e.g. 'Given I am signed in as an onboarded user')" unless @user
+
+  table.hashes.each do |row|
+    create(:garment, user: @user, **garment_attributes_from_row(row).symbolize_keys)
+  end
 end
 
+# ENV changes in these steps are undone after each scenario (features/support/env_sandbox.rb).
 Given("AI image generation is disabled") do
-  pending "Phase 2 Step 5"
+  ENV["AI_IMAGE_GEN_ENABLED"] = "false"
 end
 
-Given("the AI blocks images for {string}") do |_kind|
-  pending "Phase 2 Step 5"
+Given("the AI blocks images for {string}") do |kind|
+  Ai::Client::Fake.stub(kind, Ai::ContentBlockedError.new("Image blocked by safety filter"))
 end
 
-Given("the {string} feature is disabled") do |_flag|
-  pending "Phase 2 Step 4"
+Given("the {string} feature is disabled") do |flag|
+  ENV["FEATURE_#{flag.upcase}"] = "false"
 end
 
 When("I choose the category {string}") do |_category|

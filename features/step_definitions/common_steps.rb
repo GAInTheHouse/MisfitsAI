@@ -37,7 +37,15 @@ Then("I should see {string}") do |text|
 end
 
 When("background jobs finish") do
-  perform_enqueued_jobs
+  # A job can enqueue more jobs (photo extraction -> draft images; retries), and perform_enqueued_jobs
+  # only runs the jobs queued when it is called, so drain until the queue is empty (design doc 8.1).
+  rounds = 0
+  until enqueued_jobs.empty?
+    rounds += 1
+    raise "Background jobs still enqueued after 20 rounds: #{enqueued_jobs.map { _1[:job] }.tally}" if rounds > 20
+
+    perform_enqueued_jobs
+  end
 end
 
 Given("today is {string}") do |date|

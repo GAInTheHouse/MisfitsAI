@@ -4,9 +4,12 @@
 
 ## Progress
 
-| Step | Branch | Status |
-|---|---|---|
-| 1. Acceptance specs | `p2/acceptance-specs` | In review |
+All Phase 2 work is committed directly on `phase-2`, one or more logical commits per step, and goes to `main` as a single PR at the end (same approach as Phase 1).
+
+| Step | Status |
+|---|---|
+| 1. Acceptance specs | Done (approved; fast-forwarded from `p2/acceptance-specs`) |
+| 2. Test infrastructure and prerequisites | In review |
 
 ## Shipped
 
@@ -14,6 +17,12 @@
   - `features/wardrobe/manual_add.feature`, `manage.feature`, `search.feature`, `photo_intake.feature`
   - `features/receipts/receipts.feature`
   - Pending step definitions: `features/step_definitions/{wardrobe,search,photo_intake,receipt}_steps.rb`
+- Test harness (Step 2):
+  - `features/harness/test_harness.feature` (not `@wip`, runs in CI) with `harness_steps.rb` and `features/support/harness_jobs.rb`.
+  - `spec/infrastructure/test_harness_spec.rb`: Phase 2 factory lint, Action Cable test adapter, Phase 2 option lists.
+  - Implemented steps: "my wardrobe contains:" (8.3 canonical table), "AI image generation is disabled", "the AI blocks images for {string}", "the {string} feature is disabled".
+  - Factories: `spec/factories/garments.rb` (`:garment` with category, `:hidden`, `:pending_image`, `:with_image` traits; `:intake_batch`; `:garment_draft`).
+  - Upload fixtures in `spec/fixtures/files/`: `garment.jpg`, `outfit.jpg`, `blank.jpg`, `receipt.jpg`, `receipt.pdf` (hand-built, text extractable by pdf-reader), `not_an_image.txt`. Oversized uploads are generated at run time, not committed.
 
 ## Not done / deferred
 
@@ -26,11 +35,20 @@
   - All other Brakeman checks stay enabled. CI still runs `bin/brakeman --no-pager -q -w2`.
   - **Rails must be upgraded before 2026-11-07.** On that date Brakeman switches to a High-confidence "ended on" warning with a different warning code and fingerprint, which this entry does not cover. CI will fail again on its own until Rails is upgraded.
   - Upgrading is out of Phase 2 scope. To file as a `phase-1` issue (owner: Dev 1).
+- **Cucumber always uses the fake AI adapter.** `features/support/ai_fake.rb` sets `AI_ADAPTER=fake` at load time and before every scenario, and fails the scenario if `Ai::Client.current` is not `Ai::Client::Fake`. Before this, a shell or `.env` with `AI_ADAPTER=vertex` sent Cucumber to the real adapter.
+- **ENV sandbox for Cucumber.** `features/support/env_sandbox.rb` restores `ENV` after every scenario.
+- **G4: "When background jobs finish" now drains the queue** (`features/step_definitions/common_steps.rb`). It repeats `perform_enqueued_jobs` until nothing is enqueued, and raises after 20 rounds. Same meaning as before; it now also runs jobs enqueued by other jobs (design doc 8.1).
+- **G3: test Action Cable adapter is `async`** (`config/cable.yml`), so broadcasts reach the Cuprite browser (8.1). RSpec swaps in the test adapter per example (`spec/support/action_cable.rb`), because rspec-rails' `have_broadcasted_to` needs it.
+- **G1: AI fixtures.** `spec/fixtures/ai/garment_extraction.json` and `receipt_extraction.json` now hold `items` shaped like the 6.6 and 6.12 schemas. The `kind` key is kept so `spec/services/ai/client/fake_spec.rb` stays unchanged. The extraction fixture includes mapper edge cases (uppercase color, `pattern: "none"`, null material, a brand). The 1x1 PNG fixtures are unchanged.
+- **G2: `config/options.yml`.** The starter catalog is completed (was 3 of 21 items) and a commented Phase 2 block adds `search_brands`, `search_materials`, `search_kinds_by_category`. `Options` symbolizes keys, so kinds are read as `Options.fetch(:search_kinds_by_category)[:top]`.
+- **G8: CSS.** `app/assets/tailwind/application.css` defines `.pill` (checked and focus states via `:has()`), `.tab` (active state set by `shared--tabs`), `.badge` and `.spinner`, which the shared partials already used.
+- **Garment factory moved** from `spec/factories/users.rb` to `spec/factories/garments.rb` (the Phase 2 path in 10.2). Its default `image_status` changed from `ready` to `placeholder`, since no image is attached; `:with_image` gives a `ready` garment with a real attachment. Existing specs only use the name and owner, so none changed.
 - **`spec/examples.txt` untracked.** It was committed but RSpec rewrites it on every run (per-machine state). Removed from the index with `git rm --cached` (the local file is kept) and added to `.gitignore`.
 
 ## Deviations from the design doc
 
-- [DEVIATION] 10.7: Step 1 also carries the two CI-maintenance changes above, so CI stays green for every later Phase 2 branch.
+- [DEVIATION] 10.7: Phase 2 is one PR with logical commits on `phase-2`, not one PR per `p2/<topic>` branch. This follows the Phase 1 approach, at the team's request. Step 1 was written on `p2/acceptance-specs` and fast-forwarded into `phase-2`.
+- [DEVIATION] 10.7: Step 1 also carries the two CI-maintenance changes above, so CI stays green for the rest of Phase 2.
 
 Planned, not yet made (to be confirmed in their steps):
 
@@ -46,11 +64,14 @@ Planned, not yet made (to be confirmed in their steps):
 - [DECISION] Photo upload errors reuse the 6.11 avatar copy: "Image too large" and "Please upload a JPEG, PNG, WebP or HEIC image".
 - [DECISION] A failed photo analysis shows a "Try again" button that returns to the upload form. There is no retry route for photo intakes in 7.1.
 - [DECISION] A receipt over 10 MB shows "File too large".
+- [DECISION] 12.3 says "All brands (SEARCH_BRANDS, 50)" but lists 51 names. All 51 are kept, in the doc's order; none is dropped without a reason.
+- [DECISION] Garments created by "Given my wardrobe contains:" use `source: manual` and `image_status: placeholder` (no image is attached). Blank cells mean "not set" so column defaults apply; an unknown column raises.
 - [DECISION] Extra scenarios beyond the 12.1 minimum: a category is required, an 80-character name limit, the image kill switch and the blocked-image fallback, a private-address image is never fetched (4.4), the 6-draft cap, draft image failure, discard, the source photo is purged, and the feature flags hide the Photo AI and Receipt tabs.
 
 ## Known issues (Phase 1, to file; not blocking Phase 2)
 
 - Rails 8.0 end of life on 2026-11-07 (see above).
+- `spec/factories/users.rb` `:user_profile` factory always fails: it builds a user, whose `after_create` already creates the profile, then saves a second one (unique index on `user_profiles.user_id`). Found by `FactoryBot.lint`; the Phase 2 lint is scoped to Phase 2 factories until it is fixed.
 - `config/initializers/vips.rb` checks `defined?(Vips)`, but `ruby-vips` is `require: false`, so the memory limits never apply (R14 risk on Heroku).
 - Rack::Attack has no 60-per-hour per-user limit on AI POSTs (4.4).
 - `ApplicationJob` has no default queue or retry/discard policy.
@@ -75,11 +96,18 @@ Planned, not yet made (to be confirmed in their steps):
 6. Second GCP billing check (design doc 3.4 step 6).
 7. Heroku exit gate: all four intake paths at 390 px, no R14 memory errors.
 
-## How to verify (Step 1)
+## Still to do from the Phase 1 gap list
+
+- G6 (`garment_drafts.attrs` has no `{}` default): Step 3, with the model layer (needs a migration).
+- G5 (`Media::SafeFetcher` ignores HTTP status and does not rescue timeouts or connection errors): before the remote-image import in Step 6.
+- `stub_serpapi(results:)` helper and `spec/fixtures/serpapi/*`: Step 6, together with the request contract it stubs.
+- Placeholder images (`app/assets/images/placeholders/*.jpg`): Step 3.
+
+## How to verify
 
 ```bash
 AI_ADAPTER=fake COVERAGE=true bundle exec rspec
-AI_ADAPTER=fake bundle exec cucumber                 # @wip excluded by the default profile
+bundle exec cucumber                                  # @wip excluded by the default profile; fake AI is forced
 AI_ADAPTER=fake bundle exec cucumber --no-profile --dry-run --strict --tags @wip features   # all Phase 2 steps defined, none ambiguous
 bin/rubocop && bin/brakeman --no-pager -q -w2 && bundle exec bundler-audit check --update
 ```
