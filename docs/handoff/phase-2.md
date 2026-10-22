@@ -537,13 +537,13 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 
 ## 14. Integration tests that need real credentials
 
-Checks 1 and 2 have been run, locally (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
+Checks 1, 2 and 3 have been run, locally (details below). The rest are still open; no result has been recorded or assumed for them. These are local runs against the real services, not production checks: Phase 2 is not deployed to Heroku.
 
 | # | Check | Needs | Status |
 |---|---|---|---|
 | 1 | SerpAPI search: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use, and the thumbnail hosts are covered by the CSP | `SERPAPI_KEY` | **Passed locally** (2026-10-21, one request); page-2 backfill not triggered |
 | 2 | `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher` (redirects, content types, sizes) | network | **Passed locally** (2026-10-21, one download); Active Storage on local disk, so GCS is untested (check 6) |
-| 3 | Vertex `garment_extraction` with the 6.6 schema plus `confidence`, on real outfit photos, including HEIC from a phone | Vertex credentials | Not run |
+| 3 | Vertex `garment_extraction` with the 6.6 schema plus `confidence`, on real outfit photos, including HEIC from a phone | Vertex credentials | **Passed locally** (2026-10-22, one real product photo, local ADC); HEIC from a phone and further photos not yet tested |
 | 4 | Vertex `receipt_extraction` with the 6.12 schema on receipt photos and screenshots; real retailer PDF receipts through `pdf-reader` | Vertex credentials, sample receipts | Not run |
 | 5 | Imagen `garment_image` for garments and drafts, including the content-blocked fallback | Vertex credentials | Not run |
 | 6 | GCS uploads, variants and blob hand-over on draft commit | `GCS_BUCKET`, a service account with `storage.objectAdmin` | Not run |
@@ -603,6 +603,58 @@ Checks 1 and 2 have been run, locally (details below). The rest are still open; 
 - **Cleanup:** every temporary record and file was removed: the throwaway test user and its profile, 1 garment, 3 blobs, 3 attachments, 2 variant records and 3 files on disk. This was verified by each record's ID and each file's path, and the global counts matched the starting numbers. No existing user or garment was touched.
 - **Storage:** Active Storage used the local Disk service (`storage/`). **GCS uploads and variants remain untested** (check 6).
 - **Observation:** the imported image was the search's rank-1 result, the "Long-Sleeve Top" for kind "T-shirt" noted under check 1. This is the existing ranking-quality observation; the import itself behaved correctly.
+
+### Check 3: real Gemini garment extraction (PASSED, local, 2026-10-22)
+
+**Environment**
+- Google Cloud project `misfitai-512403`; model `gemini-2.5-flash`; region `us-central1`.
+- Authentication: local Application Default Credentials (`gcloud auth application-default login`, an `authorized_user` credential), through `Ai::GoogleToken`'s ADC fallback. `GOOGLE_SERVICE_ACCOUNT_JSON` was blank.
+- Checked before the request:
+  - the Vertex AI API (`aiplatform.googleapis.com`) is enabled on the project;
+  - `publishers/google/models/gemini-2.5-flash` exists in `us-central1` with launch stage GA (a read-only metadata request, not a generation request).
+- `AI_ADAPTER=vertex` and `GOOGLE_CLOUD_PROJECT=misfitai-512403` were set only in the environment of the one test process (`bin/rails runner`). `.env` is unchanged: `AI_ADAPTER=fake`, and `GOOGLE_CLOUD_PROJECT` is still blank there, so it has to be set to run Vertex locally.
+
+**Test input**
+- One real JD Sports product photograph: a white Nike Pro long-sleeve crop top and black Nike Pro shorts. It is the same image as check 2: `media.jdsports.com`, JPEG, 2000×2000, 219,875 bytes.
+- Downloaded once through `Media::SafeFetcher`, checked with `Media::ImageNormalizer.sniff!`, and deleted from the scratchpad after the test.
+
+**Path tested:** the app's own code, with no separate implementation:
+1. `Wardrobe::PhotoIntake::ImagePreparer`;
+2. `Ai::Client.current` (`Ai::Client::Vertex`) `generate_json(kind: :garment_extraction)`, with the real `PhotoIntake::Prompts::EXTRACTION` and `GARMENT_SCHEMA`;
+3. `PhotoIntake::Mapper`.
+
+There was no job and no retry. In-process instrumentation capped the run at one request, and nothing printed or stored contained the token, the request body or the image data.
+
+**Results**
+- Exactly one Gemini generation request.
+- HTTP 200, latency 2,608 ms (`ai_calls.latency_ms`; 2,677 ms including fetching the token), `finishReason: STOP`.
+- Token usage: 2,959 prompt and 169 output tokens.
+- The response passed the existing JSON schema: every required field present, every enum value valid, no fields outside the schema. The optional `confidence` field was filled in.
+- `PhotoIntake::Mapper` produced two drafts, and both garments were classified correctly:
+
+  | Name | Category / sub_category | Colour | Brand | Material | Fit | Formality / season | Confidence | Needs confirmation |
+  |---|---|---|---|---|---|---|---|---|
+  | Long Sleeve Crop Top | top / `crop_top` | white | Nike | synthetic | athletic | casual / all_season | 0.9 | no |
+  | Athletic Shorts | bottom / `shorts` | black | Nike | synthetic | athletic | casual / all_season | 0.9 | no |
+
+  Gemini answered `pattern: "solid"`, which the mapper stores as no pattern, as designed.
+- No wardrobe records were created: no garments, drafts, intake batches or users.
+
+**Usage**
+- One `ai_calls` row is kept: `garment_extraction`, `gemini-2.5-flash`, `status ok`, `images_in 1`, `images_out 0`, `est_cost_cents 0.5`, no user.
+- 0.5¢ is our internal estimate (`config/ai_pricing.yml`), not the actual Google Cloud charge; GCP Billing is authoritative. From the token counts, the list price is likely well below the estimate.
+
+**Additional observations** (no code changed)
+- **SerpAPI timeout:** the approved SerpAPI search, meant to find a multi-garment image, timed out after 8 seconds (`Net::ReadTimeout` -> `Wardrobe::Search::Error`, "request failed"). No retry was attempted, and the JD Sports image was used instead. The request may still have counted toward SerpAPI usage.
+- **Follow-up: the 8-second SerpAPI read timeout may be too restrictive.** Check 1 took 6.3 seconds and this request passed 8. Revisit it as a separate change; it is recorded here, not changed.
+- **`input_chars` for vision calls:** the field includes the base64 image (448,222 for this call), so it does not represent meaningful text input size. This is existing Phase 1 logging.
+- **Prepared image size:** `ImagePreparer` turned the 220 KB JPEG into a 334 KB JPEG (1600×1600, quality 90). This is a possible optimization, not a functional defect.
+- **Scope:** this test validates the Vertex extraction and mapping path, not the complete browser-based intake workflow (upload, `ExtractGarmentsJob`, drafts, review, commit).
+
+**Next integration checks**
+1. Gemini receipt extraction (check 4).
+2. Imagen image generation (check 5).
+3. Google Cloud Storage (check 6).
 
 ## 15. How to verify
 
