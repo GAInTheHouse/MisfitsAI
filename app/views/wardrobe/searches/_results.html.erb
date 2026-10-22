@@ -1,0 +1,15 @@
+<%# locals: (results: [], search: {}, error: nil) %>
+<div id="garment_search_results_body" class="space-y-3">
+  <% if error %>
+    <p role="alert" class="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style="border-color: var(--error); color: var(--error);"><%= error %></p>
+  <% elsif results.empty? %>
+    <p class="text-sm text-[var(--muted)]">No matching product photos. Try other keywords or a brand.</p>
+  <% else %>
+    <p class="text-sm text-[var(--muted)]"><%= pluralize(results.size, "result") %></p>
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <% results.each do |result| %>
+        <%= render "wardrobe/searches/result", result: result, search: search %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

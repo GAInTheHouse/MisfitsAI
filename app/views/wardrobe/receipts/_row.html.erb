@@ -1,0 +1,52 @@
+<%# locals: (draft:) %>
+<%# One editable receipt item (design doc 6.12). Inputs name the review form (form="receipt_review_form"). %>
+<% prefix = "drafts[#{draft.id}]" %>
+<% field_id = ->(name) { "receipt_draft_#{draft.id}_#{name}" } %>
+<% price = draft.attrs["price_cents"] && format("%.2f", draft.attrs["price_cents"] / 100.0) %>
+<article id="<%= dom_id(draft) %>" class="receipt-row space-y-2 rounded-[var(--radius-lg)] border p-3"
+         style="background: var(--panel-strong); border-color: <%= draft.needs_confirmation? ? 'var(--ink)' : 'var(--line)' %>;"
+         data-name="<%= draft.name %>">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <label class="flex items-center gap-2 text-sm">
+      <%= hidden_field_tag "#{prefix}[selected]", "0", id: nil, form: "receipt_review_form" %>
+      <%= check_box_tag "#{prefix}[selected]", "1", draft.selected, id: field_id.("selected"), form: "receipt_review_form",
+                        data: { wardrobe__draft_selection_target: "checkbox" } %>
+      Include
+    </label>
+    <% if draft.needs_confirmation? %>
+      <span class="badge" style="color: var(--ink); border-color: var(--ink);">Please double-check</span>
+    <% end %>
+  </div>
+  <div class="grid grid-cols-2 gap-2 sm:grid-cols-6">
+    <div class="col-span-2 space-y-1 sm:col-span-2">
+      <%= label_tag field_id.("name"), "Name", class: "text-xs font-medium" %>
+      <%= text_field_tag "#{prefix}[name]", draft.name, id: field_id.("name"), class: "input", form: "receipt_review_form" %>
+    </div>
+    <div class="space-y-1">
+      <%= label_tag field_id.("brand"), "Brand", class: "text-xs font-medium" %>
+      <%= text_field_tag "#{prefix}[brand]", draft.attrs["brand"], id: field_id.("brand"), class: "input", form: "receipt_review_form" %>
+    </div>
+    <div class="space-y-1">
+      <%= label_tag field_id.("size"), "Size", class: "text-xs font-medium" %>
+      <%= text_field_tag "#{prefix}[size]", draft.attrs["size"], id: field_id.("size"), class: "input", form: "receipt_review_form" %>
+    </div>
+    <div class="space-y-1">
+      <%= label_tag field_id.("color"), "Color", class: "text-xs font-medium" %>
+      <%= text_field_tag "#{prefix}[color_primary]", draft.attrs["color_primary"], id: field_id.("color"), class: "input",
+                         form: "receipt_review_form" %>
+    </div>
+    <div class="space-y-1">
+      <%= label_tag field_id.("category"), "Category", class: "text-xs font-medium" %>
+      <%= select_tag "#{prefix}[category]", options_for_select(garment_category_options.map(&:reverse), draft.category),
+                     id: field_id.("category"), class: "input", form: "receipt_review_form" %>
+    </div>
+    <div class="space-y-1">
+      <%= label_tag field_id.("price"), "Price", class: "text-xs font-medium" %>
+      <%= text_field_tag "#{prefix}[price]", price, id: field_id.("price"), class: "input", inputmode: "decimal",
+                         placeholder: "Unknown", form: "receipt_review_form" %>
+    </div>
+  </div>
+  <% if draft.attrs["source_line"].present? %>
+    <p class="text-xs text-[var(--muted)]">From: <%= draft.attrs["source_line"] %></p>
+  <% end %>
+</article>

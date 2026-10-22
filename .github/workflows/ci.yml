@@ -9,7 +9,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.12
@@ -38,13 +38,19 @@ jobs:
       AI_ADAPTER: fake
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/misfit_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.12
           bundler-cache: true
-      - uses: browser-actions/setup-chrome@v1
+      - uses: browser-actions/setup-chrome@v2
+      # The app and its specs process images with libvips (ruby-vips), which the runner does not ship.
+      - name: Install libvips
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - run: bin/rails db:prepare
+      # The layout links app/assets/builds/tailwind.css, a git-ignored build output (tailwindcss-rails only
+      # builds it on test:prepare / assets:precompile, which CI does not run).
+      - run: bin/rails tailwindcss:build
       - run: COVERAGE=true bundle exec rspec
 
   cucumber:
@@ -66,17 +72,43 @@ jobs:
       RAILS_ENV: test
       AI_ADAPTER: fake
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/misfit_test
+      # Use the runner's packaged Google Chrome. browser-actions/setup-chrome's default "latest" is a Chromium
+      # snapshot in the tool cache, which did not start on Ubuntu 24.04 (Ferrum::ProcessTimeoutError).
+      BROWSER_PATH: /usr/bin/google-chrome-stable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.12
           bundler-cache: true
-      - uses: browser-actions/setup-chrome@v1
+      # The app and its specs process images with libvips (ruby-vips), which the runner does not ship.
+      - name: Install libvips
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - run: bin/rails db:prepare
-      - run: bundle exec cucumber --format progress
-      - uses: actions/upload-artifact@v4
+      # The layout links app/assets/builds/tailwind.css, a git-ignored build output (tailwindcss-rails only
+      # builds it on test:prepare / assets:precompile, which CI does not run).
+      - run: bin/rails tailwindcss:build
+      # Diagnostics: the Chrome binaries Cuprite/Ferrum can find, in Ferrum's search order (the first found is
+      # used unless BROWSER_PATH is set).
+      - name: Show Chrome for Cuprite
+        run: |
+          echo "BROWSER_PATH=${BROWSER_PATH:-<unset>}"
+          for name in chrome google-chrome google-chrome-stable google-chrome-beta chromium chromium-browser; do
+            path="$(command -v "$name" || true)"
+            if [ -n "$path" ]; then echo "$name -> $path: $("$path" --version 2>&1 || true)"; fi
+          done
+      # Fails fast with Chrome's own error output if the browser cannot start (Ferrum's timeout error hides it).
+      - name: Check headless Chrome starts
+        run: timeout 60 "$BROWSER_PATH" --headless=new --disable-gpu --dump-dom about:blank > /dev/null
+      # Progress output stays on the console. The pretty report also records exceptions raised in Before and
+      # After hooks, which the progress formatter does not print.
+      - run: |
+          mkdir -p tmp/cucumber
+          bundle exec cucumber --format progress --format pretty --out tmp/cucumber/pretty.txt
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: capybara-screenshots
-          path: tmp/capybara
+          name: cucumber-failure-diagnostics
+          path: |
+            tmp/cucumber
+            tmp/capybara

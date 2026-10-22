@@ -1,0 +1,8 @@
+<%= turbo_frame_tag "receipt_intake" do %>
+  <%# Inside the frame, so the subscription survives frame navigation (see photo_intakes/show). %>
+  <%= turbo_stream_from current_user, :wardrobe %>
+  <% if @error %>
+    <p role="alert" class="mb-3 rounded-[var(--radius-md)] border px-4 py-3 text-sm" style="border-color: var(--error); color: var(--error);"><%= @error %></p>
+  <% end %>
+  <%= render "wardrobe/receipts/batch", batch: @batch %>
+<% end %>

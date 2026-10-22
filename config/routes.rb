@@ -1,4 +1,9 @@
 Rails.application.routes.draw do
+  # Security (Phase 2 Step 9): Active Storage's direct-upload endpoint needs no sign-in, so anyone could create
+  # blobs and get signed upload URLs to the bucket. The app never uses direct uploads; answer 404.
+  match "/rails/active_storage/direct_uploads", via: :all,
+                                                to: ->(_env) { [ 404, { "content-type" => "text/plain" }, [ "Not Found" ] ] }
+
   devise_for :users, controllers: { omniauth_callbacks: "users/omniauth_callbacks",
                                     registrations: "users/registrations" }
   root "home#show"

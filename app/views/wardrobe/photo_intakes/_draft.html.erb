@@ -1,0 +1,32 @@
+<%# locals: (draft:) %>
+<%# Inputs name the review form (form="draft_review_form"), so a re-rendered card still submits with it.
+    Broadcasts replace only the image area (_draft_image), never the inputs the user may be editing. %>
+<% prefix = "drafts[#{draft.id}]" %>
+<article id="<%= dom_id(draft) %>" class="garment-draft flex gap-3 rounded-[var(--radius-lg)] border p-3"
+         style="border-color: var(--line); background: var(--panel-strong);" data-name="<%= draft.name %>">
+  <div class="w-24 shrink-0"><%= render "wardrobe/photo_intakes/draft_image", draft: draft %></div>
+  <div class="flex-1 space-y-2">
+    <label class="flex items-center gap-2 text-sm">
+      <%= hidden_field_tag "#{prefix}[selected]", "0", id: nil, form: "draft_review_form" %>
+      <%= check_box_tag "#{prefix}[selected]", "1", draft.selected, id: "draft_#{draft.id}_selected", form: "draft_review_form",
+                        data: { wardrobe__draft_selection_target: "checkbox" } %>
+      Add this item
+    </label>
+    <div class="space-y-1">
+      <%= label_tag "draft_#{draft.id}_name", "Name", class: "text-xs font-medium" %>
+      <%= text_field_tag "#{prefix}[name]", draft.name, id: "draft_#{draft.id}_name", class: "input", form: "draft_review_form" %>
+    </div>
+    <div class="space-y-1">
+      <%= label_tag "draft_#{draft.id}_category", "Category", class: "text-xs font-medium" %>
+      <%= select_tag "#{prefix}[category]", options_for_select(garment_category_options.map(&:reverse), draft.category),
+                     id: "draft_#{draft.id}_category", class: "input", form: "draft_review_form" %>
+    </div>
+    <div class="flex flex-wrap gap-1">
+      <% if draft.attrs["color_primary"] %><span class="badge"><%= draft.attrs["color_primary"] %></span><% end %>
+      <% if draft.attrs["formality"] %><span class="badge"><%= garment_option_label(:formality, draft.attrs["formality"]) %></span><% end %>
+      <% if draft.needs_confirmation? %>
+        <span class="badge" style="color: var(--ink); border-color: var(--line-strong);">Please double-check</span>
+      <% end %>
+    </div>
+  </div>
+</article>

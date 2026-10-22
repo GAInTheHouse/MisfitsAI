@@ -1,0 +1,38 @@
+<%# locals: (batch:) %>
+<% drafts = batch.garment_drafts.reject(&:committed?).sort_by { [ _1.position.to_i, _1.created_at ] } %>
+<div class="space-y-4" data-controller="wardrobe--draft-selection">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h3 class="font-medium">Review items from your receipt</h3>
+    <div class="flex gap-2" data-wardrobe--draft-selection-target="toolbar" hidden>
+      <button type="button" class="btn-ghost px-3 py-1 text-xs" data-action="wardrobe--draft-selection#selectAll">Select all</button>
+      <button type="button" class="btn-ghost px-3 py-1 text-xs" data-action="wardrobe--draft-selection#selectNone">Select none</button>
+    </div>
+  </div>
+
+  <%= form_with url: commit_wardrobe_intake_batch_path(batch), id: "receipt_review_form", data: { turbo_frame: "_top" } do %>
+    <div class="space-y-3">
+      <% drafts.each do |draft| %>
+        <%= render "wardrobe/receipts/row", draft: draft %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if batch.extracted_text_preview.present? %>
+    <details class="rounded-[var(--radius-md)] border px-4 py-2 text-sm" style="border-color: var(--line);">
+      <summary class="cursor-pointer text-[var(--muted)]">Extracted text</summary>
+      <pre class="mt-2 whitespace-pre-wrap text-xs"><%= batch.extracted_text_preview %></pre>
+    </details>
+  <% end %>
+
+  <label class="flex items-center gap-2 text-sm">
+    <%= hidden_field_tag :generate_images, "0", id: nil, form: "receipt_review_form" %>
+    <%= check_box_tag :generate_images, "1", true, id: "receipt_generate_images", form: "receipt_review_form" %>
+    Generate product images
+  </label>
+
+  <div class="flex flex-wrap gap-2">
+    <button type="submit" form="receipt_review_form" class="btn-primary">Add selected</button>
+    <%= button_to "Discard", wardrobe_intake_batch_path(batch), method: :delete, class: "btn-ghost",
+                  form: { data: { turbo_confirm: "Discard these receipt items?" } } %>
+  </div>
+</div>

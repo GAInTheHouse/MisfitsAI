@@ -1,0 +1,20 @@
+<%# locals: (error: nil) %>
+<div id="receipt_intake_form" class="space-y-4">
+  <p class="text-sm text-[var(--muted)]">Upload a receipt, or paste an order confirmation, to add what you bought.</p>
+  <% if error %>
+    <p role="alert" class="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style="border-color: var(--error); color: var(--error);"><%= error %></p>
+  <% end %>
+  <%= form_with url: wardrobe_receipts_path, multipart: true, class: "space-y-3" do |f| %>
+    <div class="space-y-1">
+      <%= f.label :receipt_file, "Receipt file", class: "text-sm font-medium" %>
+      <%= f.file_field :receipt_file, accept: "image/jpeg,image/png,image/webp,image/heic,application/pdf,text/plain",
+                                      class: "block text-sm" %>
+      <p class="text-xs text-[var(--muted)]">Photo, screenshot, PDF or text file, up to 10 MB.</p>
+    </div>
+    <div class="space-y-1">
+      <%= f.label :receipt_text, "Paste receipt or order email text", class: "text-sm font-medium" %>
+      <%= f.text_area :receipt_text, rows: 6, class: "input", maxlength: Wardrobe::ReceiptsController::MAX_TEXT %>
+    </div>
+    <%= f.submit "Read receipt", class: "btn-primary" %>
+  <% end %>
+</div>

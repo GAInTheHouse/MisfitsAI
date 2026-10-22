@@ -1,1 +1,7 @@
-<%= render "shared/empty_state", title: "Wardrobe", message: "Your closet is empty. Snap a photo, search for an item, or describe it to get started." %>
+<%= turbo_stream_from current_user, :wardrobe %>
+
+<div class="space-y-6">
+  <%= render "garments/status", user: current_user %>
+  <%= render "garments/add_panel", garment: @garment %>
+  <%= render "garments/inventory", garments: @garments, category: @category, user: current_user %>
+</div>

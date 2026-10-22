@@ -51,7 +51,8 @@ class ApplicationController < ActionController::Base
     flash.now[:alert] = error.user_message
     respond_to do |format|
       format.html { redirect_back(fallback_location: root_path, alert: error.user_message) }
-      format.turbo_stream { render turbo_stream: turbo_stream.replace("flash", partial: "shared/flash") }
+      # update, not replace: shared/flash has no #flash wrapper, so replace would remove the container.
+      format.turbo_stream { render turbo_stream: turbo_stream.update("flash", partial: "shared/flash") }
       format.json { render json: { error: error.user_message }, status: :unprocessable_entity }
     end
   end
