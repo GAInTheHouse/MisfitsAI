@@ -196,6 +196,24 @@ RSpec.describe Ai::Client::Vertex, "Gemini garment images" do
       end
     end
 
+    context "when the libvips PNG decoder ignores chunk checksums (libspng, as in Ubuntu's libvips 8.15)" do
+      before do
+        decoded = double("Vips::Image", width: 64, height: 48, avg: 127.0)
+        allow(Vips::Image).to receive(:new_from_buffer).and_return(decoded)
+      end
+
+      it "still rejects a PNG with corrupt data, from its CRC" do
+        stub_request(:post, gemini).to_return(status: 200, body: reply([ image_part(corrupt(noisy_png)) ]))
+        expect { generate }.to raise_error(Ai::InvalidResponseError, "Gemini returned a PNG with corrupt data")
+        expect(AiCall.sole).to have_attributes(status: "error", error_class: "Ai::InvalidResponseError")
+      end
+
+      it "accepts an intact PNG" do
+        stub_request(:post, gemini).to_return(status: 200, body: reply([ image_part(noisy_png) ]))
+        expect(generate).to have_attributes(bytes: noisy_png, mime_type: "image/png")
+      end
+    end
+
     it "rejects an image over the pixel bound" do
       stub_const("Ai::Client::Vertex::MAX_GENERATED_IMAGE_PIXELS", 10) # the 8x8 test image has 64 pixels
       stub_request(:post, gemini).to_return(status: 200, body: reply([ image_part(png) ]))

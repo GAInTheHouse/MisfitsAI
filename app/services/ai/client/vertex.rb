@@ -32,6 +32,7 @@ module Ai
       # Garment images from a Gemini model must be one of these, decided from the bytes (the job normalizes them).
       GEMINI_GARMENT_IMAGE_TYPES = %w[image/png image/jpeg image/webp].freeze
       MAX_GENERATED_IMAGE_PIXELS = 50_000_000 # same bound as uploaded photos; Gemini returns ~1 MP
+      PNG_SIGNATURE = "\x89PNG\r\n\x1A\n".b
       GEMINI_BLOCKED_FINISH_REASONS = %w[
         SAFETY PROHIBITED_CONTENT BLOCKLIST SPII IMAGE_SAFETY IMAGE_PROHIBITED_CONTENT RECITATION
       ].freeze
@@ -240,12 +241,18 @@ module Ai
 
       # The image a Gemini garment call returned, checked before the call counts as a success: the type comes from
       # the bytes (PNG, JPEG or WebP; the declared mimeType is not trusted), and every pixel is decoded with
-      # fail_on: :error, which rejects truncated files and corrupt PNG data. Corruption inside JPEG or WebP data
-      # has no checksum and can decode to wrong pixels; nothing short of looking at the image detects that.
+      # fail_on: :error, which rejects truncated files. PNG chunk checksums are checked here first, because
+      # whether libvips does depends on its PNG decoder (libpng rejects bad CRCs; libspng, used by Ubuntu's
+      # libvips 8.15, ignores them). Corruption inside JPEG or WebP data has no checksum and can decode to wrong
+      # pixels; nothing short of looking at the image detects that.
       # Not resized here: the jobs normalize to GARMENT_ASSET_SIZE.
       def validated_garment_image(image)
         require "vips"
         mime = Media::ImageNormalizer.sniff!(image.bytes, allowed: GEMINI_GARMENT_IMAGE_TYPES)
+        if mime == "image/png" && !png_chunks_intact?(image.bytes)
+          raise InvalidResponseError, "Gemini returned a PNG with corrupt data"
+        end
+
         decoded = Vips::Image.new_from_buffer(image.bytes, "", fail_on: :error)
         if decoded.width * decoded.height > MAX_GENERATED_IMAGE_PIXELS
           raise InvalidResponseError, "Gemini returned an image larger than #{MAX_GENERATED_IMAGE_PIXELS} pixels"
@@ -257,6 +264,24 @@ module Ai
         raise InvalidResponseError, "Gemini returned data that is not a PNG, JPEG or WebP image"
       rescue Vips::Error
         raise InvalidResponseError, "Gemini returned an image that could not be decoded"
+      end
+
+      # Every chunk, from the signature to IEND, is complete and matches its CRC-32.
+      def png_chunks_intact?(bytes)
+        return false unless bytes.start_with?(PNG_SIGNATURE)
+
+        offset = PNG_SIGNATURE.bytesize
+        while offset + 12 <= bytes.bytesize
+          length = bytes.byteslice(offset, 4).unpack1("N")
+          type_and_data = bytes.byteslice(offset + 4, 4 + length)
+          crc = bytes.byteslice(offset + 8 + length, 4)
+          return false unless type_and_data.bytesize == 4 + length && crc&.bytesize == 4
+          return false unless Zlib.crc32(type_and_data) == crc.unpack1("N")
+          return true if type_and_data.start_with?("IEND")
+
+          offset += 12 + length
+        end
+        false
       end
 
       def image_model_for(kind) = kind.to_s == "garment_image" ? garment_image_model : imagen_model
