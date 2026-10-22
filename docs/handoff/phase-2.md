@@ -1,6 +1,17 @@
 # Phase 2 handoff (Dev 2, 2026-10-21)
 
-> **Status: implementation complete and verified locally. The exit gate is NOT passed.** Items 1, 3, 4, 5 and 8 of the 10.4 gate need the PR, the Heroku deploy and real credentials (see "Exit gate"). Nothing in this note has been run against real Google Cloud or SerpAPI. "Verified" means verified locally with the fake AI adapter and stubbed HTTP, unless it says otherwise.
+> **Status: implementation complete and verified locally. The exit gate is NOT passed.** Items 1, 3, 4, 5 and 8 of the 10.4 gate need the PR, the Heroku deploy and further credentials (see "Exit gate").
+>
+> **How things were verified:**
+> - The automated suites (RSpec, Cucumber) use the fake AI adapter and stubbed HTTP. "Verified" means that, unless a passage says otherwise.
+> - **Integration checks 1–6 then passed locally against the real services** (section 14):
+>   - SerpAPI search;
+>   - remote image import;
+>   - Vertex AI Gemini garment extraction, receipt extraction and garment image generation;
+>   - Cloud Storage, including keyless signed URLs.
+> - **Nothing has been deployed**, and no production configuration has been validated.
+
+> **Google Cloud setup:** architecture, existing resources, authentication (ADC and keyless signed URLs), environment variables, developer workflows, costs and limitations are in [`docs/google-cloud-setup.md`](../google-cloud-setup.md). Section 14 below keeps the integration test history.
 
 ## Contents
 
@@ -95,7 +106,7 @@ Details by step:
 - **Photo intake (Step 7):**
   - Controllers: `Wardrobe::PhotoIntakesController`, `IntakeBatchesController` (`commit` and `destroy`) and `DraftsController#update`.
   - Photo-intake services: `Wardrobe::PhotoIntake::{Prompts, Mapper, ImagePreparer, Commit}`.
-  - Jobs: `Wardrobe::ExtractGarmentsJob`, `GenerateDraftImageJob` and `PurgeStaleDraftsJob` (daily at 4am, `config/recurring.yml`).
+  - Jobs: `Wardrobe::ExtractGarmentsJob`, `GenerateDraftImageJob` and `PurgeStaleDraftsJob` (daily at 4am in production: `purge_stale_intake_drafts` in `config/recurring.yml`).
 - **Receipts (Step 8):**
   - `Wardrobe::ReceiptsController`.
   - Receipt services: `Receipts::{TextParser, PdfText, VisionParser, Prompts, Intake, Commit}`.
@@ -160,7 +171,7 @@ Internal entry points (not called across domains):
 | `Wardrobe::ExtractGarmentsJob` | `ai_text` | one run per batch |
 | `Receipts::ParseImageJob` | `ai_text` | one run per batch |
 | `Wardrobe::ImportRemoteImageJob` | `default` | one run per garment |
-| `Wardrobe::PurgeStaleDraftsJob` | `default` | recurring, daily at 4am |
+| `Wardrobe::PurgeStaleDraftsJob` | `default` | recurring, daily at 4am (production only; `purge_stale_intake_drafts`) |
 
 How the pieces connect:
 - Every job declares its handlers in the same order: a catch-all `rescue_from` first, then the specific handlers, then `retry_on`, then `discard_on`.
@@ -507,7 +518,13 @@ No other migrations. Draft-to-garment links are stored in `garment_drafts.attrs[
 
 ## 11. Config vars and flags
 
-No new config vars were introduced. Phase 2 reads these, all already listed in 9.3 and `.env.example`:
+Phase 2 introduced **two new config vars**, both optional and both in `.env.example`:
+- `GARMENT_IMAGE_MODEL` (default `gemini-2.5-flash-image`): the model for garment and draft product images, after the move from Imagen to Gemini (section 5).
+- `GCS_SIGNING_SERVICE_ACCOUNT` (default none): turns on keyless IAM signing of GCS URLs (section 7).
+
+Every other variable below was already in design doc 9.3 and `.env.example`. For the full list with examples, and for which ones are needed in each environment, see [`docs/google-cloud-setup.md`](../google-cloud-setup.md), section D.
+
+Phase 2 reads these:
 
 | Var | Required | Default | Used by |
 |---|---|---|---|
@@ -519,7 +536,7 @@ No new config vars were introduced. Phase 2 reads these, all already listed in 9
 | `GCS_BUCKET`, `GOOGLE_*`, `VERTEX_*`, `IMAGEN_MODEL`, `AI_ADAPTER` | Phase 1 | Phase 1 | AI and storage |
 | `GCS_SIGNING_SERVICE_ACCOUNT` | no | none | Optional. When set to a service-account email, Active Storage signs GCS URLs through the IAM Credentials API (`iam: true`, `gsa_email`) using ADC; when absent, signing is unchanged. New in Phase 2 (section 7). Production authentication is a separate deployment decision. |
 | `GARMENT_IMAGE_MODEL` | no | `gemini-2.5-flash-image` | Phase 2 garment and draft product images (`kind: :garment_image`). `gemini-*` uses `generateContent`; `imagen-*` uses the Imagen `:predict` request. New in Phase 2 (section 5). |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | yes for deployment (Vertex and GCS) | none | Vertex: when absent or blank, `Ai::GoogleToken` falls back to Application Default Credentials (local development, section 5). GCS still needs it. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | the design doc's planned production credential (not set up or validated); leave blank locally | none | A single-line service-account key for Vertex and GCS. When it is blank or absent, `Ai::GoogleToken` (Vertex) and `config/storage.yml` (GCS) both fall back to Application Default Credentials (sections 5 and 7). |
 | `DEMO_PASSWORD` | yes, to create the demo account in production | none in production (the account is skipped); `changeme` in development and test | `db/seeds/demo_user.rb`. Production rejects known passwords and anything under 12 characters |
 | `IMAGE_GEN_SPACING_SEC` | no | `1.5` | **not used** (section 6) |
 | `SEARCH_RERANK_ENABLED`, `RECEIPT_LLM_CLEANUP` | no | `false` | **not used**: stretch features not built (section 4) |
@@ -537,19 +554,27 @@ Phase 2 leaves no new forward slots (10.3) and changes no flag defaults.
 
 ## 12. Deployment instructions
 
-These steps have **not been run yet**. They are the plan for the exit gate.
+These steps have **not been run yet**. They are the plan for the exit gate. No production configuration has been validated.
+
+**Environment variables needed in each setting** (details in [`docs/google-cloud-setup.md`](../google-cloud-setup.md), section D):
+- **Local development with fake AI and local storage:** `AI_ADAPTER=fake`, plus the Phase 1 basics (database, `DEMO_PASSWORD` for seeding). No Google Cloud or SerpAPI credentials are needed. `GOOGLE_SERVICE_ACCOUNT_JSON` stays blank.
+- **Local real integrations** (set only for the test process): `AI_ADAPTER=vertex` and `GOOGLE_CLOUD_PROJECT=misfitai-512403` for Vertex, with local ADC; `SERPAPI_KEY` for search; `GCS_BUCKET=misfitai-dev-images-2026`, plus `GCS_SIGNING_SERVICE_ACCOUNT` for signed URLs, for storage.
+- **Production deployment (planned, not validated):**
+  - **For Phase 2:** `SERPAPI_KEY`, `DEMO_PASSWORD`, and `HEIC_SUPPORTED` if HEIC is unsupported.
+  - **For Google Cloud:** `GOOGLE_CLOUD_PROJECT`, `GCS_BUCKET` (a production bucket, which does not exist yet), and a production credential, `GOOGLE_SERVICE_ACCOUNT_JSON` or another approach. The production storage authentication is still undecided.
+  - **Defaults to review:** `GARMENT_IMAGE_MODEL` and `AI_ADAPTER` (production uses Vertex unless `AI_ADAPTER=fake`).
 
 1. Open the Phase 2 PR (`phase-2` → `main`) and wait for CI to pass on the PR, then on `main` after merging.
 2. Set the Heroku config:
    ```bash
-   heroku config:set SERPAPI_KEY=<key>                # the only new required var
+   heroku config:set SERPAPI_KEY=<key>                # garment search (Google Cloud variables: see above)
    heroku config:set DEMO_PASSWORD=<password>         # 12+ characters, not a known default; without it the seed skips the demo account
    heroku config:get HEIC_SUPPORTED                   # set to false if the 9.2 HEIC check failed
    ```
 3. Deploy `main`. The release phase (`Procfile`: `release: bin/rails db:migrate`) runs the G6 migration. It is backward compatible: a column default only.
 4. Seed the demo account and wardrobe: `heroku run bin/rails db:seed`. It can be re-run safely and never prints the password. Check that the output says `Demo user: demo@misfit.ai (password from DEMO_PASSWORD)`, not `Demo user skipped`.
-5. Check that the recurring purge is loaded: `config/recurring.yml` declares `purge_stale_drafts` (daily at 4am) for the Solid Queue scheduler. It needs the worker that runs Solid Queue (`SOLID_QUEUE_IN_PUMA` or a worker dyno, as set up in Phase 1).
-6. Smoke and spend checks: `heroku run bin/rails runner bin/ai_smoke`, `/admin/ai_usage`, and GCP Billing Reports. Record the results in sections 18 and 19.
+5. Check that the recurring purge is loaded: `config/recurring.yml` declares `purge_stale_intake_drafts` (`Wardrobe::PurgeStaleDraftsJob`, every day at 4am) under its **production** key, for the Solid Queue scheduler. It does not run in development, where jobs run in-process. It needs the worker that runs Solid Queue (`SOLID_QUEUE_IN_PUMA` or a worker dyno, as set up in Phase 1).
+6. Smoke and spend checks: `heroku run bin/rails runner bin/ai_smoke`, `/admin/ai_usage`, and GCP Billing Reports. Record the results in sections 18 and 19. **`bin/ai_smoke` is not a reliable complete smoke test at present.** It stops at the first failure, its first three kinds call Discovery Engine (unverified), and the `avatar_portrait` and `outfit_preview_subject` kinds use discontinued Imagen models (404). It needs fixing before it can serve the exit gate (see the Google Cloud guide, section G).
 7. By hand at 390 px wide, run each intake path once with real AI: manual add with an image, search and add, photo intake, receipt (text, PDF and photo). Watch `heroku logs` for R14 (memory) during the photo and receipt jobs.
 8. Merge this note and push the tag `phase-2-complete`.
 
@@ -571,6 +596,11 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 - The inflation budget covers page content streams and form XObjects. Fonts and ToUnicode maps are decoded without a pre-check; they are bounded by the 10 MB file limit and the 5-second timeout.
 - `Timeout` interrupts the request thread at an arbitrary point. That is acceptable because pdf-reader holds no locks or connections, but the block must stay free of database work.
 - A PDF can hold one Puma thread for up to about 5 seconds. Rack::Attack limits receipt uploads per user.
+
+**Development environment versus production**
+- **Development jobs run in-process:** no Active Job queue adapter is set in development, so the Rails default applies.
+- **Production-only Solid Queue settings** do not apply locally: the `limits_concurrency` limits, the single-threaded `ai_images` worker (`config/queue.yml`), and the recurring tasks (`config/recurring.yml`, including `purge_stale_intake_drafts`).
+- **Still outstanding:** production GCS authentication, the Heroku deployment, and GCP Billing verification (check 7). Checks 1–6 passed locally only.
 
 **Gemini garment images**
 - **Cost estimate:** `config/ai_pricing.yml` now has `garment_image: 4.0` (approved 2026-10-22; it was 2.0).
@@ -1030,7 +1060,7 @@ The screenshots were taken with Cuprite against the local test server. That is n
 |---|---|---|---|
 | 1 | Every scenario and spec of Phases 1 and 2 passes in CI on `main`; none `@wip` | **BLOCKED** | Everything passes locally and no `@wip` scenarios remain (section 16). The PR is not open and nothing is merged, so there is no CI run on `main`. |
 | 2 | Brakeman and bundler-audit report no new warnings; RuboCop clean; SimpleCov at 85% or above for `app/services` | **PASS** (locally) | Section 16. The only Brakeman suppression is the documented Rails EOL entry from Step 1. |
-| 3 | `main` deployed to Heroku, `/up` green, features work there with real AI, checked by hand at 390 px | **BLOCKED** | No deploy, no credentials. Verified only locally with the fake adapter. |
+| 3 | `main` deployed to Heroku, `/up` green, features work there with real AI, checked by hand at 390 px | **BLOCKED** | No deploy and no production credentials. Verified only locally: the suites run on the fake adapter, and integration checks 3–5 called real Vertex AI from a single local process (section 14). |
 | 4 | `bin/ai_smoke` passes on Heroku | **BLOCKED** | Not run (section 19). |
 | 5 | AI spend checked in `/admin/ai_usage` and GCP Billing; both numbers in this note | **BLOCKED** | Not checked (section 18). |
 | 6 | Every Phase 2 contract exists with its documented signature and RSpec coverage | **PASS** | Section 3. |
@@ -1048,7 +1078,15 @@ The screenshots were taken with Cuprite against the local test server. That is n
 - GCP billing to date: **not checked (BLOCKED)**.
 - Credits applied: **unknown (BLOCKED)**.
 
-Locally, every AI call went through the fake adapter, so no spend came from Phase 2 development.
+- **Development spend (estimates only):**
+  - The automated suites use the fake adapter, so they cost nothing.
+  - The local integration checks made real Vertex calls, logged in local `ai_calls`:
+    - garment extraction, 0.5¢;
+    - receipt extraction, 0.5¢;
+    - one Gemini garment image, 4.0¢;
+    - one Imagen request that returned 404, 0¢.
+  - They also used 3 SerpAPI searches and negligible GCS operations.
+  - These are internal estimates; the actual charges are not checked (GCP Billing still BLOCKED above). Details: [`docs/google-cloud-setup.md`](../google-cloud-setup.md), section F.
 
 ## 19. bin/ai_smoke output
 
