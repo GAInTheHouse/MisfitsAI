@@ -28,6 +28,11 @@ Given("the {string} feature is disabled") do |flag|
   ENV["FEATURE_#{flag.upcase}"] = "false"
 end
 
+When("I open the {string} tab") do |label|
+  find("[role=tab]", exact_text: label).click
+  expect(page).to have_css("[role=tab][aria-selected=true]", exact_text: label)
+end
+
 When("I choose the category {string}") do |category|
   # Pills hide the radio (sr-only) under its label, so click the label as a person would.
   within("#manual_garment_form") { choose(category, allow_label_click: true) }
@@ -111,7 +116,7 @@ Then("the garment {string} should have a generated image") do |name|
 end
 
 # Browser-only: waits for the job's Turbo Stream broadcast to swap the card image, without reloading.
-Then("the card for {string} should update to its generated image") do |name|
+Then("the card for {string} should update to its generated/imported image") do |name|
   within(garment_card_css(name)) do
     expect(page).to have_css(%(img[data-image-source="attached"][src*="/rails/active_storage/representations/"]))
   end

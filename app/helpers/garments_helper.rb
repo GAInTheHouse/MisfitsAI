@@ -30,4 +30,9 @@ module GarmentsHelper
   def garment_select_options(list)
     Options.fetch(list).map { |option| [ option[:label], option[:key] ] }
   end
+
+  # Kinds grouped by category for the search form (design doc 12.3 SEARCH_KINDS_BY_CATEGORY).
+  def search_kind_options
+    Options.fetch(:search_kinds_by_category).map { |category, kinds| [ garment_category_label(category), kinds ] }
+  end
 end

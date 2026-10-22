@@ -36,7 +36,10 @@
             <%= render "garments/form", garment: garment %>
           </div>
           <div role="tabpanel" id="describe_panel_search" aria-labelledby="describe_tab_search" data-shared--tabs-target="panel" hidden>
-            <%= render "shared/empty_state", title: "Search", message: "Coming soon" %>
+            <div class="space-y-4">
+              <%= render "wardrobe/searches/form", search: {} %>
+              <%= turbo_frame_tag "garment_search_results" %>
+            </div>
           </div>
         </div>
       <% end %>

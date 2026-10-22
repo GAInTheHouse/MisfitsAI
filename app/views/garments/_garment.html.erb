@@ -29,6 +29,9 @@
         <span class="badge" style="color: var(--ink); border-color: var(--line-strong);">Hidden from outfits</span>
       <% end %>
     </div>
+    <% if garment.source == "search" && garment.image_status == "placeholder" %>
+      <p class="text-xs text-[var(--muted)]">Couldn't download that image; using a placeholder.</p>
+    <% end %>
     <div class="mt-auto flex flex-wrap gap-2 pt-1">
       <% hidden = garment.hidden_from_recommendations %>
       <%= button_to (hidden ? "Show in outfits" : "Hide from outfits"), hide_garment_path(garment),

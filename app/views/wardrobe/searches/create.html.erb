@@ -1,0 +1,8 @@
+<%# Turbo puts only the frame into the wardrobe page; without JavaScript this is a normal results page. %>
+<div class="space-y-4">
+  <h1 class="font-display text-3xl">Search results</h1>
+  <%= turbo_frame_tag "garment_search_results" do %>
+    <%= render "wardrobe/searches/results", results: @results || [], search: @search, error: @error %>
+  <% end %>
+  <%= link_to "Back to wardrobe", wardrobe_path, class: "text-sm underline underline-offset-4" %>
+</div>

@@ -5,13 +5,12 @@ Feature: Add a garment from an image search
 
   # Design doc 6.5 (ImageSearch, FilterAndRank, ImportRemoteImageJob).
   # SerpAPI is always mocked; no real network calls are made.
-  # Every scenario is @wip until Phase 2 Step 6 implements it.
+  # Image hosts resolve through FakeDns (spec/support/fake_dns.rb); nothing reaches the network.
 
   Background:
     Given I am signed in as an onboarded user
     And I am on the wardrobe page
 
-  @wip
   Scenario: Search shows product results
     Given the image search returns:
       | title                          | original                                  | thumbnail                                 | link                               |
@@ -21,7 +20,6 @@ Feature: Add a garment from an image search
     Then I should see 2 search results
     And I should see the search result "Uniqlo Oxford Shirt White"
 
-  @wip
   Scenario: Picking a result adds the garment and imports its image
     Given the image search returns:
       | title                     | original                              | thumbnail                               | link                            |
@@ -33,7 +31,6 @@ Feature: Add a garment from an image search
     When background jobs finish
     Then the garment "Uniqlo Oxford Shirt White" should have an imported image
 
-  @wip
   Scenario: Off-topic results are filtered out
     Given the image search returns:
       | title              | original                             | thumbnail                              | link                            |
@@ -43,30 +40,25 @@ Feature: Add a garment from an image search
     Then I should see the search result "Black Cotton Top"
     And I should not see the search result "Black Laptop Stand"
 
-  @wip
   Scenario: A brand or keywords are required
     When I search for garments with no brand or keywords
     Then I should see "Enter a brand or keywords"
 
-  @wip
   Scenario: The search provider fails
     Given the image search provider returns an error
     When I search for garments with keywords "white shirt"
     Then I should see "Garment search provider failed. Try again later."
 
-  @wip
   Scenario: The search provider times out
     Given the image search times out
     When I search for garments with keywords "white shirt"
     Then I should see "Garment search request failed. Please retry."
 
-  @wip
   Scenario: Search is not configured
     Given image search is not configured
     When I search for garments with keywords "white shirt"
     Then I should see "Garment search is not configured"
 
-  @wip
   Scenario: An image that cannot be downloaded falls back to the placeholder
     Given the image search returns:
       | title                     | original                              | thumbnail                               | link                            |
@@ -78,7 +70,6 @@ Feature: Add a garment from an image search
     Then the garment "Uniqlo Oxford Shirt White" should use a placeholder image
     And I should see "Couldn't download that image; using a placeholder."
 
-  @wip
   Scenario: An image hosted on a private address is never fetched
     Given the image search returns:
       | title                     | original                         | thumbnail                          | link                            |
@@ -88,3 +79,18 @@ Feature: Add a garment from an image search
     And background jobs finish
     Then the garment "Uniqlo Oxford Shirt White" should use a placeholder image
     And no request should have been made to "169.254.169.254"
+
+  @javascript
+  Scenario: Search and add a result without leaving the wardrobe page
+    Given the image search returns:
+      | title                     | original                              | thumbnail                               | link                            |
+      | Uniqlo Oxford Shirt White | https://images.example.com/oxford.jpg | https://images.example.com/oxford_t.jpg | https://shop.example.com/oxford |
+    And the image at "https://images.example.com/oxford.jpg" can be downloaded
+    When I open the "Search" tab
+    And I search for garments with brand "Uniqlo" and keywords "white shirt"
+    Then I should see 1 search result
+    When I pick the search result "Uniqlo Oxford Shirt White"
+    Then I should see the garment "Uniqlo Oxford Shirt White"
+    And I should see "Added Uniqlo Oxford Shirt White to your wardrobe."
+    When background jobs finish
+    Then the card for "Uniqlo Oxford Shirt White" should update to its imported image

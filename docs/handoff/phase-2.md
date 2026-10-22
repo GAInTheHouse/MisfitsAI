@@ -12,7 +12,8 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 | 2. Test infrastructure and prerequisites | Done (approved) |
 | 3. Model layer | Done (approved) |
 | 4. Wardrobe UI and manual garment management | Done (approved) |
-| 5. AI image generation and bulk garment creation | In review |
+| 5. AI image generation and bulk garment creation | Done (approved) |
+| 6. Garment image search and remote image import | In review |
 
 ## Shipped
 
@@ -53,7 +54,17 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
   - Specs: `spec/jobs/wardrobe/generate_garment_image_job_spec.rb`, `spec/services/wardrobe/{prompts,add_garments,starter_import}_spec.rb`, request specs for the checkbox and retry; `spec/support/env_helpers.rb`.
   - Activated the 4 remaining `manual_add.feature` scenarios; added "The generated image appears without reloading the page" (`@javascript`, proves job broadcasts reach the browser) and "A failed image can be retried".
 
+- Image search and remote import (Step 6):
+  - `Wardrobe::Search::ImageSearch` (SerpAPI `google_images`, 4 s open / 8 s read timeouts, query built in the 6.5 order, page-2 backfill, results cached 24 h by query digest, `data:` and non-http(s) image links dropped), `FilterAndRank` (6.5 algorithm), `WordLists`, `AddResult`, `Wardrobe::Search::Error` (carries the HTTP status).
+  - `Wardrobe::SearchesController`: `new` (form page), `create` (results in the `garment_search_results` frame; errors 422/502/503/504 in the frame), `select` (adds the garment for `current_user`; Turbo Stream or redirect).
+  - Search form in Describe item > Search: brand (datalist of 51 brands), keywords, category pills, kind (grouped by category), color, material, formality, season, gender (Any / Men / Women).
+  - `Wardrobe::ImportRemoteImageJob`: `Media::SafeFetcher` (10 MB, 10 s), content sniffed to JPEG/PNG/WebP, 512 square JPEG, `ready`; any download/format failure -> `placeholder` with the card note "Couldn't download that image; using a placeholder."; one run per garment; never overwrites a ready image.
+  - Specs: `spec/services/media/safe_fetcher_spec.rb` (rewritten, 36 examples), `spec/services/wardrobe/search/{filter_and_rank,image_search,add_result}_spec.rb`, `spec/jobs/wardrobe/import_remote_image_job_spec.rb`, `spec/requests/wardrobe/searches_spec.rb`; fixtures `spec/fixtures/serpapi/*.json`; `features/support/stubs/serpapi.rb`.
+  - Activated all 9 `search.feature` scenarios; added a `@javascript` scenario for the whole flow inside the wardrobe page.
+
 ## Not done / deferred
+
+- Search re-ranking with the Ranking API (`SEARCH_RERANK_ENABLED`, 6.5 stretch): not built; for Phase 4's stretch list.
 
 - Everything after Step 1. See `Progress`.
 
@@ -75,6 +86,12 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 - **Layout favicon links** (`app/views/layouts/application.html.erb`): the Rails 8 default `<link rel="icon">` / `apple-touch-icon` tags for `public/icon.png` and `icon.svg`. Without them Chrome requests `/favicon.ico`, which raises a routing error that Capybara re-raises and fails every passing `@javascript` scenario.
 - **Authorization spec** (`spec/requests/authorization_spec.rb`): Phase 2 cases for `retry_image` and the wardrobe page (8.4: each phase adds its routes).
 - **CSS:** `.input` for form fields.
+- **G5: `Media::SafeFetcher` hardened** (`app/services/media/safe_fetcher.rb`), same public contract. Every hop (first URL and each redirect, via ssrf_filter's `resolver` and `request_proc`) must be http/https on the default port with no credentials and a host outside `BLOCKED_HOSTS`; ssrf_filter still refuses private, loopback, link-local, shared and metadata addresses and connects to the vetted IP (no DNS rebinding). At most 3 redirects. Only a 2xx response counts; the body is streamed under the byte limit (Content-Length and while reading) and an overall deadline. Timeouts and network errors become `Media::FetchError`; error messages never contain the URL. DNS is a replaceable `resolver` (tests use `FakeDns`, so the Phase 1 spec no longer needs real DNS).
+- **Media error classes and `BLOCKED_HOSTS`:** each error class has its own file (`app/services/media/{invalid_image,unsafe_url,fetch}_error.rb`); `BLOCKED_HOSTS` moved to `Media::SafeFetcher::BLOCKED_HOSTS` (nothing referenced `Media::BLOCKED_HOSTS`).
+- **CSP** (`config/initializers/content_security_policy.rb`): `img-src` adds exactly the hosts in `config.x.search_thumbnail_hosts` (`encrypted-tbn0..3.gstatic.com`, `serpapi.com`) for search preview thumbnails. `ImageSearch` renders a thumbnail only from those hosts over https (anything else shows "No preview", no `<img>`), so the CSP and the page use one list. Result images carry `referrerpolicy="no-referrer"`.
+- **Rack::Attack** (`config/initializers/rack_attack.rb`): garment search has its own throttle, `POST /wardrobe/searches` 10 per minute per user (4.4), matched by exact path, so adding a result (`/wardrobe/searches/select`) no longer spends it; adding results has a separate 30-per-minute-per-user throttle. Photo intake, receipts and avatar keep the shared 10-per-minute AI throttle. Specs: `spec/requests/rate_limits_spec.rb`.
+- **`Media::TransientFetchError`** (subclass of `FetchError`, so the contract is unchanged): raised for timeouts, network errors, the overall deadline and HTTP 408/429/5xx; everything else stays a plain `FetchError`.
+- **Test support:** `spec/support/fake_dns.rb` + `features/support/fake_dns.rb` (no real DNS in tests), `spec/support/cache.rb` + `features/support/cache.rb` (empty cache per test), `features/support/browser_network.rb` (browser scenarios may only load the test server).
 - **Fixed on behalf of Phase 1: AI error classes autoload** (`app/services/ai/{error,transient_error,content_blocked_error,quota_exceeded_error,disabled_error}.rb`). They were defined inside `ai/client.rb`, so Zeitwerk could only find them after `Ai::Client` had loaded; a job's class-level `retry_on Ai::TransientError` (the 2.4 pattern) raised `NameError` in development and test (CI hid it by eager loading). Each class now has its own file with an identical definition; `client.rb` no longer declares them. `bin/rails zeitwerk:check` passes. Owner to notify: Dev 1.
 - **Fixed on behalf of Phase 1: flash container** (`app/controllers/application_controller.rb`). `handle_application_error` answered Turbo Stream requests with `turbo_stream.replace("flash", ...)`, but `shared/flash` has no `#flash` wrapper, so the first error removed the container and later messages had nowhere to go. It now uses `turbo_stream.update`. Regression spec: `spec/controllers/application_controller_spec.rb` (fails on the old code). Owner to notify: Dev 1.
 - **`spec/examples.txt` untracked.** It was committed but RSpec rewrites it on every run (per-machine state). Removed from the index with `git rm --cached` (the local file is kept) and added to `.gitignore`.
@@ -88,7 +105,7 @@ All Phase 2 work is committed directly on `phase-2`, one or more logical commits
 
 Planned, not yet made (to be confirmed in their steps):
 
-- [DEVIATION] 6.5: `STOPWORDS`, `NEGATIVE_WORDS`, `APPAREL_HINTS`, `GARMENT_NOUNS` will be rebuilt from the rules in 6.5, because `backend/garment_search_filter.py` is not available. They make no claim to match the original lists.
+- [DEVIATION] 6.5: `STOPWORDS`, `NEGATIVE_WORDS`, `APPAREL_HINTS` and `GARMENT_NOUNS` (`app/services/wardrobe/search/word_lists.rb`) are rebuilt from the role 6.5 gives each list, because `backend/garment_search_filter.py` is not available. They make no claim to match the original lists; `filter_and_rank_spec` pins the algorithm with cases whose outcome follows from the doc.
 - [DEVIATION] 8.4: `text_parser_spec` inputs will be written from the 6.12 algorithm, because the original `receipt_parser.py` tests are not available.
 
 ## Decisions made where the doc was silent
@@ -126,6 +143,12 @@ Planned, not yet made (to be confirmed in their steps):
 - [DECISION] After the last transient failure the garment is `failed` (not `placeholder`), so the card can offer "Retry image" (4.3). Placeholder means "no image by design" (switched off, over quota, blocked) and offers no retry.
 - [DECISION] `IMAGE_GEN_SPACING_SEC` is not used: each job generates one image, and production runs `ai_images` with one thread (6.4 rule 5).
 - [DECISION] `garments/_thumb` takes an optional `class:` with the default `h-full w-full object-cover`. Broadcasts re-render it with the default, so callers should size the wrapping element.
+- [DECISION] `ImageSearch` results also carry `thumbnail_url` (the provider's thumbnail, used for the preview), in addition to the documented `image_url`, `title`, `source_url`. The server downloads only `image_url`, and only after the user picks it.
+- [DECISION] When a picked result has no category, `AddResult` takes the category of the chosen kind, else a garment noun in the title or keywords (`WordLists::CATEGORY_BY_NOUN`), else shows "Category can't be blank". Formality and season default like manual add (casual, all-season).
+- [DECISION] `SafeFetcher` only allows the default ports (80 for http, 443 for https) and no credentials in URLs, on every hop.
+- [DECISION] Search errors answer with the status the error implies (422 missing query, 502 provider failure, 503 not configured, 504 timeout or connection failure) and render inside the results frame. SerpAPI's 200 "Google hasn't returned any results" is an empty result, not an error.
+- [DECISION] The remote import retries temporary failures (`Media::TransientFetchError`), three attempts in all with growing waits, keeping the garment `pending` meanwhile; after the last attempt, and immediately for any permanent failure (other 4xx, unsafe URL, too large, not an image), it keeps the placeholder (6.5). It runs on the `default` queue (no AI involved).
+- [DECISION] Search result links that carry an `api_key` parameter, or our key itself, are dropped before anything is rendered or stored.
 - [DECISION] Extra scenarios beyond the 12.1 minimum: a category is required, an 80-character name limit, the image kill switch and the blocked-image fallback, a private-address image is never fetched (4.4), the 6-draft cap, draft image failure, discard, the source photo is purged, and the feature flags hide the Photo AI and Receipt tabs.
 
 ## Known issues (Phase 1, to file; not blocking Phase 2)
@@ -138,7 +161,6 @@ Planned, not yet made (to be confirmed in their steps):
 - `AVATAR_IMAGEN_MODEL` is not read; avatars use `IMAGEN_MODEL` (Phase 4 concern).
 - `APP_HOST` is not read (OmniAuth `full_host`, mailer host is hardcoded to `example.com`).
 
-- `Media::InvalidImageError`, `Media::UnsafeUrlError`, `Media::FetchError` and `Media::BLOCKED_HOSTS` have the same autoload problem as the AI errors had (defined inside `image_normalizer.rb` / `safe_fetcher.rb`). Not referenced at class level yet; to be fixed with the SafeFetcher hardening (G5) in Step 6.
 - `app/views/shared/_pill_group.html.erb`: its magic comment `<%# locals: name:, options:, selected: nil, multiple: false %>` is not strict-locals syntax (no parentheses), so the defaults are never applied and any caller that omits `multiple:` or `selected:` raises `NameError`. Phase 2 passes both explicitly.
 
 ## Concurrency limitations (image generation)
@@ -147,6 +169,10 @@ Planned, not yet made (to be confirmed in their steps):
 - If one run lasts longer than the 10-minute concurrency window (a very slow Imagen call plus retries), a second run may start and make a second AI call. Its image is then discarded by the overwrite guard, so the cost is one extra call, never a replaced image.
 - Several jobs for one garment can still be queued (e.g. two manual adds of separate garments are fine; one garment queued twice runs twice in sequence). The second run makes no AI call because the image is ready.
 - The double-click retry spec runs requests one after another, so it would also pass without the compare-and-set; the guard against truly simultaneous requests rests on the single `UPDATE ... WHERE image_status = 'failed'`.
+
+## Rate limits still to do
+
+- G10: the hourly per-user limit for AI POSTs (4.4: 60 per hour) is not added yet; planned for the hardening step.
 
 ## Schema changes after Phase 1
 
@@ -158,7 +184,7 @@ Planned, not yet made (to be confirmed in their steps):
 
 ## Integration tests that need credentials (run before the exit gate)
 
-1. SerpAPI with a real `SERPAPI_KEY`: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use.
+1. SerpAPI with a real `SERPAPI_KEY`: response shape matches `spec/fixtures/serpapi/*`, page-2 backfill, quota use, and the thumbnail hosts are covered by the CSP (`*.gstatic.com`, `serpapi.com`).
 2. `ImportRemoteImageJob` fetching real third-party image hosts through `Media::SafeFetcher`.
 3. Vertex `garment_extraction` and `receipt_extraction` with the Phase 2 response schemas against real Gemini.
 4. Imagen `garment_image` (garments and drafts), including the content-blocked fallback.
@@ -168,8 +194,6 @@ Planned, not yet made (to be confirmed in their steps):
 
 ## Still to do from the Phase 1 gap list
 
-- G5 (`Media::SafeFetcher` ignores HTTP status and does not rescue timeouts or connection errors): before the remote-image import in Step 6.
-- `stub_serpapi(results:)` helper and `spec/fixtures/serpapi/*`: Step 6, together with the request contract it stubs.
 - Step 7 hazard: committing a draft attaches the draft's image blob to the new garment (6.6 `garment.image.attach(draft.image.blob)`). Destroying the draft or batch afterwards would purge that shared blob, so the commit must detach the draft's attachment first (or not purge it). Cover this with a spec in Step 7.
 
 ## Working agreements for Phase 2 tests
