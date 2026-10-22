@@ -16,9 +16,9 @@ When GCP/Heroku/OAuth are ready (owner or Dev 1):
 
 | Step | Command / action |
 |------|------------------|
-| Provision GCP | `./script/provision/gcp.sh YOUR_PROJECT_ID` |
-| OAuth client | Console checklist in [runbook.md](../runbook.md) |
-| Provision Heroku | `./script/provision/heroku.sh misfit-ai` + GitHub auto-deploy |
+| Provision GCP | `./script/provision/gcp.sh YOUR_PROJECT_ID`. **Placeholder:** it only prints a message and provisions nothing. For what actually exists, see [`docs/google-cloud-setup.md`](../google-cloud-setup.md) |
+| OAuth client | Console checklist in [runbook.md](../runbook.md). *(Note, 2026-10-22: the runbook has no OAuth checklist.)* |
+| Provision Heroku | `./script/provision/heroku.sh misfit-ai` + GitHub auto-deploy. **Placeholder:** the script only prints a message |
 | Smoke test | `AI_ADAPTER=vertex bin/rails runner bin/ai_smoke` (paste output into `phase-1.md`) |
 | Billing | GCP Billing > Reports; `/admin/ai_usage` with `X-Analytics-Key` |
 | Tag | After merge + smoke: `git tag phase-1-complete && git push --tags` |

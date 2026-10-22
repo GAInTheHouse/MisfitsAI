@@ -1,0 +1,71 @@
+<%# locals: (garment:) %>
+<%# Manual add (design doc 6.4). The 80-character name limit is enforced by the model and shown as a hint;
+    there is no maxlength, so an over-long name gets an explicit error instead of being cut off silently. %>
+<div id="manual_garment_form">
+  <%= form_with model: garment, url: garments_path, class: "space-y-4" do |f| %>
+    <% if garment.errors.any? %>
+      <div role="alert" class="rounded-[var(--radius-md)] border px-4 py-3 text-sm" style="border-color: var(--error); color: var(--error);">
+        <ul class="list-disc pl-5">
+          <% garment.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="space-y-1">
+      <%= f.label :name, class: "text-sm font-medium" %>
+      <%= f.text_field :name, required: true, class: "input", aria: { describedby: "garment_name_hint" } %>
+      <p id="garment_name_hint" class="text-xs text-[var(--muted)]">Up to <%= Garment::NAME_MAX_LENGTH %> characters, e.g. White Oxford Shirt</p>
+    </div>
+
+    <fieldset class="space-y-2">
+      <legend class="text-sm font-medium">Category</legend>
+      <%= render "shared/pill_group", name: "garment[category]", options: garment_category_options, selected: garment.category, multiple: false %>
+    </fieldset>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="space-y-1">
+        <%= f.label :color_primary, "Color", class: "text-sm font-medium" %>
+        <%= f.text_field :color_primary, list: "garment_color_options", class: "input", autocomplete: "off" %>
+        <datalist id="garment_color_options">
+          <% Options.fetch(:search_colors).each do |color| %>
+            <option value="<%= color %>"></option>
+          <% end %>
+        </datalist>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :brand, class: "text-sm font-medium" %>
+        <%= f.text_field :brand, list: "garment_brand_options", class: "input", autocomplete: "off" %>
+        <datalist id="garment_brand_options">
+          <% Options.fetch(:search_brands).each do |brand| %>
+            <option value="<%= brand %>"></option>
+          <% end %>
+        </datalist>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :formality, class: "text-sm font-medium" %>
+        <%= f.select :formality, garment_select_options(:formality), {}, class: "input" %>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :seasonality, "Season", class: "text-sm font-medium" %>
+        <%= f.select :seasonality, garment_select_options(:seasonality), {}, class: "input" %>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :size, class: "text-sm font-medium" %>
+        <%= f.text_field :size, class: "input" %>
+      </div>
+      <div class="space-y-1">
+        <%= f.label :fit_notes, class: "text-sm font-medium" %>
+        <%= f.text_field :fit_notes, class: "input" %>
+      </div>
+    </div>
+
+    <label class="flex items-center gap-2 text-sm">
+      <%= check_box_tag :generate_image, "1", true %>
+      Generate a product image
+    </label>
+
+    <%= f.submit "Add to wardrobe", class: "btn-primary" %>
+  <% end %>
+</div>

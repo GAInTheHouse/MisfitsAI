@@ -60,11 +60,5 @@ FactoryBot.define do
     est_cost_cents { 10 }
   end
 
-  factory :garment do
-    user
-    sequence(:name) { |n| "Garment #{n}" }
-    category { "top" }
-    source { "manual" }
-    image_status { "ready" }
-  end
+  # The :garment factory lives in spec/factories/garments.rb (Phase 2).
 end

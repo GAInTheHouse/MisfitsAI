@@ -1,1 +1,29 @@
-{"kind":"garment_extraction","ok":true}
+{
+  "kind": "garment_extraction",
+  "items": [
+    {
+      "item_type": "crewneck sweater",
+      "color": "Cream",
+      "pattern": "solid",
+      "material": "wool",
+      "fit_style": "relaxed",
+      "category": "top",
+      "sub_category": "sweater",
+      "formality": "casual",
+      "seasonality": "cold",
+      "brand": null
+    },
+    {
+      "item_type": "straight jeans",
+      "color": "blue",
+      "pattern": "none",
+      "material": "denim",
+      "fit_style": null,
+      "category": "bottom",
+      "sub_category": "jeans",
+      "formality": "casual",
+      "seasonality": "all_season",
+      "brand": "Levi's"
+    }
+  ]
+}

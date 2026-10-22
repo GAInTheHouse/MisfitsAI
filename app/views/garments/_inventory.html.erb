@@ -1,0 +1,19 @@
+<%# locals: (garments:, category:, user:) %>
+<%# Category filters reload only this frame and update the URL (?category=), design doc 6.4. %>
+<%= turbo_frame_tag "wardrobe_inventory", data: { turbo_action: "advance" } do %>
+  <nav id="wardrobe_filters" aria-label="Filter by category" class="flex flex-wrap gap-2 mb-4">
+    <%= link_to "All", wardrobe_path, class: [ "pill", ("active" if category.nil?) ], aria: { current: ("page" if category.nil?) } %>
+    <% GarmentsHelper::WARDROBE_FILTERS.each do |key| %>
+      <%= link_to garment_category_label(key), wardrobe_path(category: key),
+                  class: [ "pill", ("active" if category == key) ], aria: { current: ("page" if category == key) } %>
+    <% end %>
+  </nav>
+
+  <div id="garments" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    <% if garments.any? %>
+      <%= render partial: "garments/garment", collection: garments %>
+    <% else %>
+      <%= render "garments/empty", category: category %>
+    <% end %>
+  </div>
+<% end %>

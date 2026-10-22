@@ -1,0 +1,8 @@
+<div class="space-y-4">
+  <h1 class="font-display text-3xl">Search for a garment</h1>
+  <%= render "shared/card" do %>
+    <%= render "wardrobe/searches/form", search: @search %>
+  <% end %>
+  <%= turbo_frame_tag "garment_search_results" %>
+  <%= link_to "Back to wardrobe", wardrobe_path, class: "text-sm underline underline-offset-4" %>
+</div>

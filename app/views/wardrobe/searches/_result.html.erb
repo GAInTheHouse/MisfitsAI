@@ -1,0 +1,23 @@
+<%# locals: (result:, search:) %>
+<%# The preview is the provider's thumbnail, and only from a host the CSP allows (ImageSearch#preview_url).
+    The full image is downloaded by the server, through Media::SafeFetcher, only after the user adds it. %>
+<article class="search-result flex flex-col overflow-hidden rounded-[var(--radius-lg)] border"
+         style="border-color: var(--line); background: var(--panel-strong);" data-title="<%= result[:title] %>">
+  <div class="flex aspect-square items-center justify-center" style="background: var(--panel);">
+    <% if result[:thumbnail_url] %>
+      <%= image_tag result[:thumbnail_url], alt: result[:title], loading: "lazy", referrerpolicy: "no-referrer",
+                                           class: "h-full w-full object-contain" %>
+    <% else %>
+      <span class="text-xs text-[var(--muted)]">No preview</span>
+    <% end %>
+  </div>
+  <div class="flex flex-1 flex-col gap-2 p-2">
+    <p class="text-xs leading-snug line-clamp-2"><%= result[:title].presence || "Untitled" %></p>
+    <% if (host = URI.parse(result[:source_url].to_s).host rescue nil) %>
+      <p class="text-xs text-[var(--muted)]"><%= host %></p>
+    <% end %>
+    <%= button_to "Add to wardrobe", select_wardrobe_searches_path, class: "btn-ghost mt-auto px-3 py-1 text-xs",
+                  params: { image_url: result[:image_url], title: result[:title], source_url: result[:source_url],
+                            search: search.slice(*Wardrobe::SearchesController::SEARCH_FIELDS) } %>
+  </div>
+</article>

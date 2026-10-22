@@ -5,7 +5,7 @@ default:
   garment_extraction: 0.5
   receipt_extraction: 0.5
   selfie_description: 0.5
-  garment_image: 2.0
+  garment_image: 4.0 # gemini-2.5-flash-image: 1290 output tokens x $30/1M = 3.87¢, rounded up (internal estimate)
   avatar_portrait: 2.0
   outfit_preview_subject: 4.0
   outfit_preview_gemini: 4.0

@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
 module Media
-  class InvalidImageError < ApplicationError; end
-
+  # Errors live in their own files (app/services/media/*_error.rb) so they autoload on first use.
   class ImageNormalizer
     ALLOWED = %w[image/jpeg image/png image/webp image/heic].freeze
 

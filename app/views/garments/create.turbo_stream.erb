@@ -1,0 +1,6 @@
+<%= turbo_stream.remove "wardrobe_empty" %>
+<%= turbo_stream.prepend "garments", partial: "garments/garment", locals: { garment: @garment } %>
+<%= turbo_stream.replace "wardrobe_status", partial: "garments/status", locals: { user: current_user } %>
+<%= turbo_stream.replace "manual_garment_form", partial: "garments/form",
+                         locals: { garment: Garment.new(GarmentsController::MANUAL_DEFAULTS) } %>
+<%= turbo_stream.update "flash", partial: "shared/flash" %>

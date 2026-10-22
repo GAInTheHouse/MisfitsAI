@@ -1,0 +1,9 @@
+<%= turbo_frame_tag "photo_intake" do %>
+  <%# Inside the frame: when the frame navigates here, Turbo keeps only the frame's contents, so the
+      subscription must travel with them for the job's broadcasts to reach this page. %>
+  <%= turbo_stream_from current_user, :wardrobe %>
+  <% if @error %>
+    <p role="alert" class="mb-3 rounded-[var(--radius-md)] border px-4 py-3 text-sm" style="border-color: var(--error); color: var(--error);"><%= @error %></p>
+  <% end %>
+  <%= render "wardrobe/photo_intakes/batch", batch: @batch %>
+<% end %>

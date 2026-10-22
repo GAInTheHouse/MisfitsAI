@@ -1,0 +1,7 @@
+<%# locals: (batch:) %>
+<% drafts = batch.garment_drafts %>
+<% done = drafts.where.not(status: "pending").count %>
+<div id="<%= dom_id(batch, :progress) %>" class="space-y-1">
+  <p class="text-xs text-[var(--muted)]"><%= done %> of <%= drafts.size %> product images ready</p>
+  <progress class="w-full" max="100" value="<%= batch.progress %>" aria-label="Product images"><%= batch.progress %>%</progress>
+</div>

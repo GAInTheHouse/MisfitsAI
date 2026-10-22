@@ -1,1 +1,23 @@
-{"kind":"receipt_extraction","ok":true}
+{
+  "kind": "receipt_extraction",
+  "items": [
+    {
+      "name": "Oxford Shirt",
+      "brand": "Uniqlo",
+      "size": "M",
+      "color": "white",
+      "category": "top",
+      "price": 39.9,
+      "confidence": 0.92
+    },
+    {
+      "name": "Slim Fit Chinos",
+      "brand": "Uniqlo",
+      "size": "32",
+      "color": "khaki",
+      "category": "bottom",
+      "price": 49.9,
+      "confidence": 0.61
+    }
+  ]
+}
