@@ -317,6 +317,16 @@ Each fix has a regression spec that fails on the old code, unless stated.
 
 ### Other changes to Phase 1 files
 
+- **GCS credentials and keyless signing in `config/storage.yml`** (Stage A of the approved signing plan; implemented and tested offline only, not yet verified against Google Cloud; see check 6). Only the `google` service changed; `local` and `test`, and which service each environment uses (development `local`, test `test`, production `google`), are unchanged.
+  - **Credentials:** a nonblank `GOOGLE_SERVICE_ACCOUNT_JSON` is used as the key, as before. A blank, whitespace-only or absent value now **omits** `credentials`, so `Google::Cloud::Storage` falls back to Application Default Credentials. Previously an absent value rendered `credentials: {}`, an empty key, and ADC was not used.
+  - **Keyless signing:** a nonblank `GCS_SIGNING_SERVICE_ACCOUNT` adds `iam: true` and `gsa_email:` (the value, trimmed and quoted). Active Storage's GCS service then signs URLs by calling the IAM Credentials API's `signBlob` as that service account, authenticating with ADC. Blank or absent keeps the previous signing: the credentials' own private key.
+  - **Checked against the installed gems** (activestorage 8.0.5.1, google-cloud-storage 1.62.1, googleauth 1.17.5, google-apis-iamcredentials_v1 0.28.0):
+    - `GCSService` passes `issuer`/`signer` when `iam` is set, and builds the client with `config.except(:bucket, :cache_control, :iam, :gsa_email)`;
+    - `Google::Cloud::Storage.new` falls back to `Storage::Credentials.default` (its own `STORAGE_*`/`GOOGLE_CLOUD_*` variables, then the gcloud ADC file, then application-default discovery) when no credentials are given;
+    - googleauth accepts the symbol-keyed key hash that the Active Storage configurator produces;
+    - the V2 signer accepts the `Proc` signer.
+  - **Caveat (both set):** with a JSON key *and* `GCS_SIGNING_SERVICE_ACCOUNT`, uploads and downloads use the key, but signing still calls `signBlob` with **ADC**, not the key. Heroku has no ADC, so do not set both there unless an ADC source is also configured.
+  - **Specs:** `spec/config/storage_yml_spec.rb` (15 examples) renders the file as Rails does for every combination (absent, blank or whitespace key; with or without a signing account; both). It checks what reaches `Google::Cloud::Storage.new`, and runs the real client and signer offline (locally generated key, stubbed `signBlob`): user ADC without a signing account raises `SignedUrlUnavailable` (the check 6 failure); with one, the URL is signed through IAM as that account; a key alone signs locally as before. Against the previous `storage.yml`, 9 of the 15 fail.
 - **Garment images through Gemini** (`app/services/ai/client/vertex.rb`; [DEVIATION] 3.6/6.4 in section 5; approved 2026-10-22). The public interface `generate_image(kind:, prompt:, aspect_ratio: "1:1", user:)` is unchanged, and the image jobs, prompts, fake adapter and authentication are untouched.
   - **Model selection:** `kind: :garment_image` reads `GARMENT_IMAGE_MODEL` (default `gemini-2.5-flash-image`). A `gemini-*` model goes through the new private `generate_gemini_image`; any other value keeps the Imagen `:predict` request unchanged (regression-tested). Every other image kind still reads `IMAGEN_MODEL`. `IMAGEN_MODEL`, `AVATAR_IMAGEN_MODEL`, `OUTFIT_SUBJECT_MODEL` and `OUTFIT_GEMINI_IMAGE_MODEL` are unchanged.
   - **Request differences from Imagen:**
@@ -507,6 +517,7 @@ No new config vars were introduced. Phase 2 reads these, all already listed in 9
 | `HEIC_SUPPORTED` | no | `true` | photo and receipt uploads. Set `false` if the Heroku HEIC check (9.2) fails |
 | `AI_IMAGE_GEN_ENABLED`, `AI_DAILY_IMAGE_LIMIT`, `AI_DAILY_VISION_LIMIT`, `AI_DAILY_BUDGET_CENTS` | Phase 1 | Phase 1 | kill switch and quotas, honored by every Phase 2 AI job |
 | `GCS_BUCKET`, `GOOGLE_*`, `VERTEX_*`, `IMAGEN_MODEL`, `AI_ADAPTER` | Phase 1 | Phase 1 | AI and storage |
+| `GCS_SIGNING_SERVICE_ACCOUNT` | no | none | Optional. When set to a service-account email, Active Storage signs GCS URLs through the IAM Credentials API (`iam: true`, `gsa_email`) using ADC; when absent, signing is unchanged. New in Phase 2 (section 7). Production authentication is a separate deployment decision. |
 | `GARMENT_IMAGE_MODEL` | no | `gemini-2.5-flash-image` | Phase 2 garment and draft product images (`kind: :garment_image`). `gemini-*` uses `generateContent`; `imagen-*` uses the Imagen `:predict` request. New in Phase 2 (section 5). |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | yes for deployment (Vertex and GCS) | none | Vertex: when absent or blank, `Ai::GoogleToken` falls back to Application Default Credentials (local development, section 5). GCS still needs it. |
 | `DEMO_PASSWORD` | yes, to create the demo account in production | none in production (the account is skipped); `changeme` in development and test | `db/seeds/demo_user.rb`. Production rejects known passwords and anything under 12 characters |
@@ -901,16 +912,30 @@ Both attempts are recorded below.
 - `blob.url(expires_in: 5.minutes)` failed with **`Google::Cloud::Storage::SignedUrlUnavailable`**. Signing happens locally, so no request was made, and no URL was produced or printed.
 - **Why:** the local ADC user credentials (`authorized_user`) have no private key, so they cannot sign GCS URLs. Active Storage's GCS service can sign without a key only with `iam: true` and a service account (`gsa_email`), which is not configured.
 - **Consequence:** GCS-backed images cannot currently be displayed through the app's existing redirect routes (`rails_blob_path` and `rails_representation_path` redirect to `blob.url`), so garment images stored in GCS would not render.
-- **Preferred next step:** investigate keyless IAM signing with a dedicated service account. This has not been implemented or verified.
+- **Preferred next step:** investigate keyless IAM signing with a dedicated service account. This has not been implemented or verified. (Stage A has since implemented the application configuration, below; the Google Cloud setup and a real signing test are pending.)
 
 **Configuration limitations**
-- `GOOGLE_SERVICE_ACCOUNT_JSON` currently has to be **present but blank** for the ADC fallback. With the variable absent, `storage.yml` passes `credentials: {}` (an empty key), so ADC is not used.
+- At the time of the test, `GOOGLE_SERVICE_ACCOUNT_JSON` had to be **present but blank** for the ADC fallback. With the variable absent, `storage.yml` passed `credentials: {}` (an empty key), so ADC was not used. Stage A changed this in the configuration (below).
 - `GCS_BUCKET` and `GOOGLE_CLOUD_PROJECT` were set only for the test process; both are blank in `.env`.
 - The existing development bucket `misfitai-dev-images-2026` is in **`us-east1`** (regional, uniform access, public access prevention enforced). The design doc proposes `misfit-<env>-media` in `us-central1`.
 - **Production storage is still outstanding:** no production bucket, no runtime identity, and no credentials for Heroku.
 - The **IAM Credentials API** (`iamcredentials.googleapis.com`) is currently **disabled**.
 - **No service account** exists in the project.
 - **Not exercised:** variants stored in GCS, the blob hand-over on draft commit, and the image jobs writing to GCS.
+
+**Keyless signing, Stage A: application configuration (implemented, tested offline; check 6 stays PARTIAL PASS)**
+- **Implemented:**
+  - `config/storage.yml` omits `credentials` when `GOOGLE_SERVICE_ACCOUNT_JSON` is blank or absent, so ADC is used whether the variable is blank or missing.
+  - It adds `iam: true` and `gsa_email` when the new optional `GCS_SIGNING_SERVICE_ACCOUNT` is set.
+  - `.env.example` documents the variable.
+  - `spec/config/storage_yml_spec.rb` covers every combination offline (section 7).
+- **Pending Google Cloud setup** (approved direction, not done; each step to be confirmed before running):
+  1. create `misfitai-dev-storage@misfitai-512403.iam.gserviceaccount.com` (no key);
+  2. grant it `roles/storage.objectViewer` on `misfitai-dev-images-2026` only;
+  3. grant the developer's Google account `roles/iam.serviceAccountTokenCreator` on that service account only;
+  4. enable `iamcredentials.googleapis.com`.
+- **Pending verification:** one real signed URL generated with `GCS_SIGNING_SERVICE_ACCOUNT` set only for the test process, and fetched once (expect HTTP 200 and the original bytes). Until then, check 6 stays **PARTIAL PASS** and images stored in GCS cannot be displayed.
+- **Production** authentication (a service-account key, keyless signing, or proxying) is still a separate deployment decision; see the both-set caveat in section 7.
 
 ## 15. How to verify
 
