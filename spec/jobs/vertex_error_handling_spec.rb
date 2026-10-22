@@ -17,6 +17,9 @@ RSpec.describe "Vertex errors in jobs" do
     allow(Ai::Client).to receive(:current).and_return(Ai::Client::Vertex.new)
   end
 
+  # Imagen regression: these examples use the Imagen :predict path for garment images.
+  around { |example| with_env("GARMENT_IMAGE_MODEL" => "imagen-4.0-fast-generate-001") { example.run } }
+
   def google_error(code, status) = JSON.generate(error: { code:, status:, message: "x" })
 
   describe Wardrobe::GenerateGarmentImageJob do

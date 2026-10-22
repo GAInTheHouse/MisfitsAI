@@ -14,6 +14,10 @@ RSpec.describe Ai::Client::Vertex do
     ENV["GOOGLE_CLOUD_PROJECT_NUMBER"] = "123456789"
   end
 
+  # The examples below predate the Gemini migration and exercise the Imagen :predict path for garment images, so they
+  # pin GARMENT_IMAGE_MODEL to Imagen (Imagen regression coverage). Gemini garment images are covered further down.
+  around { |example| with_env("GARMENT_IMAGE_MODEL" => "imagen-4.0-fast-generate-001") { example.run } }
+
   def google_error(code, status, message = "details", details: [])
     JSON.generate(error: { code: code, message: message, status: status, details: details })
   end
@@ -39,7 +43,7 @@ RSpec.describe Ai::Client::Vertex do
                    headers: json_headers)
       call_imagen
       expect(AiCall.sole).to have_attributes(status: "ok", kind: "garment_image", model: "imagen-4.0-fast-generate-001",
-                                             images_out: 1, error_class: nil, est_cost_cents: 2.0)
+                                             images_out: 1, error_class: nil, est_cost_cents: Ai::CallLogger::PRICING["garment_image"])
     end
 
     it "returns plain text, and an empty text when Gemini gives none without a safety reason" do
@@ -292,7 +296,7 @@ RSpec.describe Ai::Client::Vertex do
         )
         2.times { expect { client.generate_image(kind: :garment_image, prompt: "s", user:) }.to raise_error(Ai::TransientError) }
         expect(client.generate_image(kind: :garment_image, prompt: "s", user:).bytes).to eq("img")
-        expect(AiCall.order(:created_at).pluck(:status, :est_cost_cents)).to eq([ [ "error", 0 ], [ "error", 0 ], [ "ok", 2.0 ] ])
+        expect(AiCall.order(:created_at).pluck(:status, :est_cost_cents)).to eq([ [ "error", 0 ], [ "error", 0 ], [ "ok", Ai::CallLogger::PRICING["garment_image"] ] ])
       end
     end
 

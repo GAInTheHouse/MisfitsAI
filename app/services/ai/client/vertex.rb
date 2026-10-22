@@ -4,6 +4,10 @@ module Ai
   class Client
     # Vertex AI (Gemini, Imagen) and Discovery Engine over REST.
     #
+    # Garment product images (kind :garment_image) use GARMENT_IMAGE_MODEL, default gemini-2.5-flash-image, through
+    # Gemini generateContent: Google discontinued the Imagen GA endpoints (see docs/handoff/phase-2.md). An imagen-*
+    # value still uses the Imagen :predict request below, unchanged. Other image kinds keep IMAGEN_MODEL.
+    #
     # Errors (design doc 3.7, extended in Phase 2; see docs/handoff/phase-2.md):
     #   400 -> InvalidRequestError, or ContentBlockedError when Google's structured ErrorInfo names a safety reason
     #   401, 403 -> AuthenticationError; 404 -> NotFoundError; 429 -> RateLimitedError (a TransientError)
@@ -25,7 +29,12 @@ module Ai
       SAFETY_REASON = /(?:\A|_)(?:SAFETY|RAI|RESPONSIBLE_AI|PROHIBITED_CONTENT|BLOCKLIST)(?:_|\z)/
       ERROR_INFO_TYPE = "type.googleapis.com/google.rpc.ErrorInfo"
       # Gemini finish reasons that mean the output was withheld by a filter.
-      GEMINI_BLOCKED_FINISH_REASONS = %w[SAFETY PROHIBITED_CONTENT BLOCKLIST SPII IMAGE_SAFETY RECITATION].freeze
+      # Garment images from a Gemini model must be one of these, decided from the bytes (the job normalizes them).
+      GEMINI_GARMENT_IMAGE_TYPES = %w[image/png image/jpeg image/webp].freeze
+      MAX_GENERATED_IMAGE_PIXELS = 50_000_000 # same bound as uploaded photos; Gemini returns ~1 MP
+      GEMINI_BLOCKED_FINISH_REASONS = %w[
+        SAFETY PROHIBITED_CONTENT BLOCKLIST SPII IMAGE_SAFETY IMAGE_PROHIBITED_CONTENT RECITATION
+      ].freeze
 
       def generate_json(kind:, prompt:, schema:, images: [], system: nil, user: nil,
                         temperature: 0.2, max_output_tokens: 2048)
@@ -77,10 +86,13 @@ module Ai
       end
 
       def generate_image(kind:, prompt:, aspect_ratio: "1:1", user: nil)
+        model = image_model_for(kind)
+        return generate_gemini_image(kind:, prompt:, aspect_ratio:, user:, model:) if gemini_model?(model)
+
         check_disabled!(kind)
         check_quotas!(kind, user, 0, 1)
-        attempt(kind: kind, model: imagen_model, user: user, input_chars: prompt.length) do |started|
-          url = imagen_url(imagen_model)
+        attempt(kind: kind, model: model, user: user, input_chars: prompt.length) do |started|
+          url = imagen_url(model)
           payload = {
             instances: [ { prompt: prompt } ],
             parameters: {
@@ -94,7 +106,7 @@ module Ai
           json = request_json(:post, url, payload)
           image = decode_imagen_prediction(json)
           latency_ms = elapsed_ms(started)
-          log_call(kind: kind, model: imagen_model, status: "ok", latency_ms: latency_ms, user: user,
+          log_call(kind: kind, model: model, status: "ok", latency_ms: latency_ms, user: user,
                    input_chars: prompt.length, images_out: 1)
           image
         end
@@ -132,17 +144,7 @@ module Ai
                            response_modalities: %w[TEXT IMAGE])
         post_gemini(kind: kind, model: outfit_gemini_model, body: body, user: user, images_in: images.size,
                     images_out: 1) do |json|
-          part = json.dig("candidates", 0, "content", "parts")&.find { |p| p["inlineData"] }
-          unless part
-            raise ContentBlockedError, "Gemini withheld the image (safety)" if gemini_blocked?(json)
-
-            raise InvalidResponseError, "No image in response"
-          end
-
-          Ai::Image.new(
-            bytes: Base64.decode64(part.dig("inlineData", "data")),
-            mime_type: part.dig("inlineData", "mimeType") || "image/png"
-          )
+          decode_gemini_image(json)
         end
       end
 
@@ -193,6 +195,72 @@ module Ai
         log_failure(error, kind: kind, model: model, user: user, input_chars: input_chars, started: started)
         raise error
       end
+
+      # Text-to-image with a Gemini image model (generateContent). Same guards, quotas and logging as Imagen:
+      # the kill switch, the daily image cap, the budget, one ai_calls row per attempt (images_out 1 on success).
+      def generate_gemini_image(kind:, prompt:, aspect_ratio:, user:, model:)
+        check_disabled!(kind)
+        check_quotas!(kind, user, 0, 1)
+        body = {
+          contents: [ { role: "user", parts: [ { text: prompt } ] } ],
+          generationConfig: { responseModalities: %w[TEXT IMAGE], imageConfig: { aspectRatio: aspect_ratio } }
+        }
+        attempt(kind: kind, model: model, user: user, input_chars: prompt.length) do |started|
+          json = request_json(:post, gemini_url(model), body)
+          image = validated_garment_image(decode_gemini_image(json))
+          log_call(kind: kind, model: model, status: "ok", latency_ms: elapsed_ms(started), user: user,
+                   input_chars: prompt.length, images_out: 1)
+          image
+        end
+      end
+
+      # The first inlineData part of a Gemini response, with its MIME type. Text parts are ignored. No image:
+      # ContentBlockedError when the response carries a safety indicator, else InvalidResponseError.
+      def decode_gemini_image(json)
+        content = first_candidate(json)&.fetch("content", nil)
+        parts = content.is_a?(Hash) && content["parts"].is_a?(Array) ? content["parts"] : []
+        inline = parts.lazy.filter_map { _1["inlineData"] if _1.is_a?(Hash) && _1["inlineData"].is_a?(Hash) }.first
+        unless inline
+          raise ContentBlockedError, "Gemini withheld the image (safety)" if gemini_blocked?(json)
+
+          raise InvalidResponseError, "No image in response"
+        end
+
+        data = inline["data"]
+        raise InvalidResponseError, "Gemini image data is missing" unless data.is_a?(String) && data.present?
+
+        bytes = begin
+          Base64.strict_decode64(data)
+        rescue ArgumentError
+          raise InvalidResponseError, "Gemini image data is not valid base64"
+        end
+        mime = inline["mimeType"]
+        Ai::Image.new(bytes: bytes, mime_type: mime.is_a?(String) && mime.match?(%r{\Aimage/[\w.+-]+\z}) ? mime : "image/png")
+      end
+
+      # The image a Gemini garment call returned, checked before the call counts as a success: the type comes from
+      # the bytes (PNG, JPEG or WebP; the declared mimeType is not trusted), and every pixel is decoded with
+      # fail_on: :error, which rejects truncated files and corrupt PNG data. Corruption inside JPEG or WebP data
+      # has no checksum and can decode to wrong pixels; nothing short of looking at the image detects that.
+      # Not resized here: the jobs normalize to GARMENT_ASSET_SIZE.
+      def validated_garment_image(image)
+        require "vips"
+        mime = Media::ImageNormalizer.sniff!(image.bytes, allowed: GEMINI_GARMENT_IMAGE_TYPES)
+        decoded = Vips::Image.new_from_buffer(image.bytes, "", fail_on: :error)
+        if decoded.width * decoded.height > MAX_GENERATED_IMAGE_PIXELS
+          raise InvalidResponseError, "Gemini returned an image larger than #{MAX_GENERATED_IMAGE_PIXELS} pixels"
+        end
+
+        decoded.avg # decodes every pixel; raises Vips::Error on truncated or corrupt data
+        Ai::Image.new(bytes: image.bytes, mime_type: mime)
+      rescue Media::InvalidImageError
+        raise InvalidResponseError, "Gemini returned data that is not a PNG, JPEG or WebP image"
+      rescue Vips::Error
+        raise InvalidResponseError, "Gemini returned an image that could not be decoded"
+      end
+
+      def image_model_for(kind) = kind.to_s == "garment_image" ? garment_image_model : imagen_model
+      def gemini_model?(model) = model.to_s.start_with?("gemini-")
 
       def gemini_body(prompt:, system: nil, images: [], temperature: 0.2, max_output_tokens: 2048,
                       json_schema: nil, response_modalities: nil)
@@ -345,6 +413,7 @@ module Ai
       def vision_model = ENV.fetch("VERTEX_VISION_MODEL", "gemini-2.5-flash")
       def grounded_model = ENV.fetch("GROUNDED_MODEL", "gemini-2.5-flash")
       def imagen_model = ENV.fetch("IMAGEN_MODEL", "imagen-4.0-fast-generate-001")
+      def garment_image_model = ENV.fetch("GARMENT_IMAGE_MODEL", "gemini-2.5-flash-image")
       def outfit_subject_model = ENV.fetch("OUTFIT_SUBJECT_MODEL", "imagen-3.0-capability-001")
       def outfit_gemini_model = ENV.fetch("OUTFIT_GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
       def ranking_model = ENV.fetch("RANKING_MODEL", "semantic-ranker-default@latest")
