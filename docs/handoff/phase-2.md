@@ -189,6 +189,14 @@ The original sources were not available, so these were rebuilt. None of them cla
 - [DEVIATION] 8.4: the inputs in `spec/services/receipts/text_parser_spec.rb` are written from the 6.12 algorithm, because the original `receipt_parser.py` tests are not available.
 
 **Behaviour**
+- [DEVIATION] 3.6 and 3.7: Vertex error handling distinguishes more failure kinds. The five 3.7 classes are unchanged; new classes are added alongside them.
+  - **What the doc specifies:**
+    - 3.7 lists `TransientError` (429, 5xx, timeouts) and `ContentBlockedError` ("safety filter / empty result").
+    - 3.6 says an empty Imagen `predictions` is a `ContentBlockedError`.
+  - **What was built:**
+    - `ContentBlockedError` now needs an explicit safety indicator. An empty result without one, including empty Imagen predictions, is the new `Ai::InvalidResponseError`.
+    - New classes: `Ai::InvalidRequestError`, `Ai::AuthenticationError`, `Ai::NotFoundError`, `Ai::RateLimitedError` (a `TransientError`) and `Ai::InvalidResponseError` (section 7).
+  - **Why:** before the first real calls, a 400 schema error, a 401/403 credentials problem or a 404 wrong model ID was reported as a safety block or a parse error. Jobs then quietly fell back to a placeholder.
 - [DEVIATION] 3.4: Google authentication also supports Application Default Credentials for local development.
   - **What the doc specifies:** `Ai::GoogleToken` always reads `GOOGLE_SERVICE_ACCOUNT_JSON`, because Heroku has no ADC.
   - **What was built:**
@@ -299,6 +307,42 @@ Each fix has a regression spec that fails on the old code, unless stated.
   - Development and test keep the `changeme` default from `.env.example`.
 
 ### Other changes to Phase 1 files
+
+- **Vertex error handling** (`app/services/ai/client/vertex.rb`; [DEVIATION] 3.6/3.7 in section 5; approved 2026-10-22). Request payloads, URLs, headers, model IDs, regions, authentication and the parsing of successful responses are unchanged; that was checked with a diff.
+  - **HTTP mapping**, from the status and Google's structured fields only (`error.message` is never read):
+
+    | Response | Raised |
+    |---|---|
+    | 400 | `InvalidRequestError`; `ContentBlockedError` only when a `google.rpc.ErrorInfo` detail's `reason` (an enum value) names a safety reason |
+    | 401, 403 | `AuthenticationError` |
+    | 404 | `NotFoundError` |
+    | 408, 5xx, timeouts and connection failures | `TransientError` |
+    | 429 | `RateLimitedError`, a `TransientError` |
+    | Any other 4xx | `InvalidRequestError` |
+    | A 2xx body that is not a JSON object | `InvalidResponseError` |
+
+  - **Safety blocks** (`ContentBlockedError`, logged as `blocked`) are recognized only from:
+    - Gemini `promptFeedback.blockReason`;
+    - a Gemini `finishReason` of `SAFETY`, `PROHIBITED_CONTENT`, `BLOCKLIST`, `SPII`, `IMAGE_SAFETY` or `RECITATION` with no output;
+    - Imagen `raiFilteredReason`;
+    - the structured 400 above.
+
+    Without one of these, empty or unparseable output is an `InvalidResponseError`: Gemini JSON cut off at `MAX_TOKENS`, empty Imagen predictions, or no image from the multimodal model.
+  - **Messages and logs** carry only validated values:
+    - the exception message: `"Vertex HTTP 403 PERMISSION_DENIED"`, or `"Vertex request failed (Faraday::TimeoutError)"`;
+    - `Ai::Error#http_status` and `#google_status` (canonical `google.rpc.Code` names only);
+    - one `Rails.logger.warn` line per failure, with the kind, model, HTTP status, Google status, error class and latency.
+
+    They never include prompts, images, tokens, credentials, request bodies or response bodies.
+  - **`ai_calls`:** every HTTP attempt that gets a response or fails on the network writes exactly one row. A failure records `status` `error` or `blocked`, its `error_class`, latency, kind, model and user, with `images_in = images_out = 0` and `est_cost_cents = 0` (`Ai::CallLogger.log(billable: false)`), so failed attempts do not use up the per-user image or vision caps or the budget.
+    - **Zero estimated cost does not mean the provider charged nothing**; Google Cloud Billing is the authoritative source.
+    - Our own quota and kill-switch refusals, and credential failures before the request, make no request and write no row, as before.
+  - **Retries:** the Faraday retry middleware is removed. It never ran, because faraday-retry only retries idempotent methods and every Vertex call is a `POST`. The jobs' `retry_on Ai::TransientError, attempts: 3` (429 included) is the only retry, so each job attempt sends exactly one request.
+  - **Timeouts:** a 10-second `open_timeout` is added; the 120-second request timeout is kept.
+  - **What jobs now do** (job code unchanged):
+    - `AuthenticationError`, `NotFoundError`, `InvalidRequestError` and `InvalidResponseError` reach each job's catch-all, so the garment is `failed` (with "Retry image") or the intake batch is `failed`, and the error is re-raised, instead of a silent placeholder;
+    - genuine blocks still keep the placeholder.
+  - **Specs:** `spec/services/ai/client/vertex_spec.rb` (every category, safety, malformed responses, successes, failure logging, leak checks, a single request per attempt), `spec/jobs/vertex_error_handling_spec.rb` (the job policies with the real adapter and stubbed HTTP) and `spec/services/ai/call_logger_spec.rb`. Against the original adapter, 47 of the 61 Vertex and job examples fail. The 14 that pass cover behaviour that was already right: successes, quota and credential refusals, 429 as transient, the placeholder for a genuine block, and the 5xx job retry.
 
 - **ADC support in `Ai::GoogleToken`** (`app/services/ai/google_token.rb`; [DEVIATION] 3.4 in section 5; approved 2026-10-22).
   - **Deployment:** with `GOOGLE_SERVICE_ACCOUNT_JSON` set and nonblank, it builds the same `ServiceAccountCredentials` with the same `cloud-platform` scope, and caches the token the same way.
@@ -472,6 +516,13 @@ Rollback: `heroku rollback vNN`. The migration needs no rollback, because the ol
 - The inflation budget covers page content streams and form XObjects. Fonts and ToUnicode maps are decoded without a pre-check; they are bounded by the 10 MB file limit and the 5-second timeout.
 - `Timeout` interrupts the request thread at an arbitrary point. That is acceptable because pdf-reader holds no locks or connections, but the block must stay free of database work.
 - A PDF can hold one Puma thread for up to about 5 seconds. Rack::Attack limits receipt uploads per user.
+
+**Vertex error handling**
+- `ai_calls.est_cost_cents` is our estimate, and failed attempts are recorded as 0. The provider may still charge for some of them (for example a blocked Gemini prompt's input tokens). Use GCP Billing for real spend.
+- The safety reasons Vertex puts in a 400's `ErrorInfo` are not documented for every model. `SAFETY_REASON` matches enum values that contain `SAFETY`, `RAI`, `RESPONSIBLE_AI`, `PROHIBITED_CONTENT` or `BLOCKLIST`; confirm it against the first real Imagen block. Until then, an unrecognized safety 400 is an `InvalidRequestError`: a visible failure with "Retry image", which is the safe direction.
+- The configured model IDs (`gemini-2.5-flash` for `VERTEX_VISION_MODEL` and `VERTEX_TEXT_MODEL`, `imagen-4.0-fast-generate-001` for `IMAGEN_MODEL`) have not been checked against Vertex AI in `us-central1`. Models are retired on Google's schedule; check them in the Model Garden before the first real calls. A retired or unavailable model now fails as `Ai::NotFoundError` (HTTP 404), not as a safety block.
+- The Imagen request does not ask for `includeRaiReason` (request payloads were not changed), so an Imagen-filtered image may come back as empty predictions. That is now an `InvalidResponseError` (garment `failed`, "Retry image"), not a placeholder, and retrying will likely be filtered again. Adding `includeRaiReason: true` is a payload change for a later step.
+- The `rescue_from(StandardError)` catch-all in the image jobs re-raises configuration errors. In production, Solid Queue records them as failed jobs, which is intended so they are noticed.
 
 **Google credentials**
 - `Ai::GoogleToken` caches one token without recording which credential source issued it. If `GOOGLE_SERVICE_ACCOUNT_JSON` or the ADC login changes while a process is running, the old token stays in use until it nears expiry (refreshed 60 seconds early; tokens last about an hour), until `Ai::GoogleToken.reset!`, or until a restart. Restart `bin/dev` or the console after changing credentials. Production is not affected, because config var changes restart the dynos.

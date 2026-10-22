@@ -8,7 +8,7 @@ module Wardrobe
     queue_as :ai_images
 
     # At most one job per garment runs at a time (Solid Queue): a second one waits, then finds the image ready
-    # and stops without calling the AI. The duration outlasts a slow Imagen call with HTTP retries.
+    # and stops without calling the AI. The duration outlasts a slow Imagen call (up to 120 s; no HTTP-level retries).
     limits_concurrency key: ->(garment_id) { "garment-image-#{garment_id}" }, to: 1, duration: 10.minutes
 
     # Handlers declared later win, so the catch-all comes first.
