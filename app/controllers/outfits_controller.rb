@@ -1,7 +1,13 @@
 # frozen_string_literal: true
 
 class OutfitsController < ApplicationController
-  include ComingSoon
-  def index; render_coming_soon(title: "Outfits"); end
-  def show; render_coming_soon(title: "Outfit detail"); end
+  before_action :authenticate_user!
+
+  def index
+    @outfits = current_user.outfits.order(date: :desc)
+  end
+
+  def show
+    @outfit = current_user.outfits.find(params[:id])
+  end
 end
