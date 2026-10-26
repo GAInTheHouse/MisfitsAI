@@ -19,7 +19,7 @@ module Planner
       bottom = bottoms.sample
       shoe = shoes.sample
 
-      [top, bottom, shoe].compact
+      [ top, bottom, shoe ].compact
     end
   end
 end
