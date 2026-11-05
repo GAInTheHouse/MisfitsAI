@@ -62,12 +62,12 @@ module Avatars
       return [ nil, nil ] unless profile.avatar.attached?
 
       avatar_jpeg   = profile.avatar.download
-      avatar_image  = Ai::Image.new(data: avatar_jpeg, mime_type: "image/jpeg")
+      avatar_image  = Ai::Image.new(bytes: avatar_jpeg, mime_type: "image/jpeg")
       prompt        = Avatars::Prompts.outfit_subject(outfit_desc: outfit_desc)
       result        = Ai::Client.current.generate_image_with_subject(
         kind: :outfit_preview_subject, prompt: prompt, subject: avatar_image, aspect_ratio: "9:16", user: user
       )
-      jpeg = Media::ImageNormalizer.to_jpeg(result.data)
+      jpeg = Media::ImageNormalizer.to_jpeg(result.bytes)
       [ jpeg, "imagen_subject" ]
     rescue Ai::Error, StandardError
       [ nil, nil ]
@@ -77,11 +77,11 @@ module Avatars
       return [ nil, nil ] unless profile.avatar.attached?
 
       avatar_jpeg    = profile.avatar.download
-      avatar_img     = Ai::Image.new(data: avatar_jpeg, mime_type: "image/jpeg")
+      avatar_img     = Ai::Image.new(bytes: avatar_jpeg, mime_type: "image/jpeg")
       garment_images = rec.garments_in_display_order.filter_map do |g|
         next unless g.image.attached?
 
-        Ai::Image.new(data: g.image.download, mime_type: "image/jpeg")
+        Ai::Image.new(bytes: g.image.download, mime_type: "image/jpeg")
       end
 
       images = [ avatar_img, *garment_images ]
@@ -89,7 +89,7 @@ module Avatars
       result = Ai::Client.current.generate_image_multimodal(
         kind: :outfit_preview_gemini, prompt: prompt, images: images, user: user
       )
-      jpeg = Media::ImageNormalizer.to_jpeg(result.data)
+      jpeg = Media::ImageNormalizer.to_jpeg(result.bytes)
       [ jpeg, "gemini_image" ]
     rescue Ai::Error, StandardError
       [ nil, nil ]

@@ -17,6 +17,11 @@ FactoryBot.define do
       onboarding_step { 4 }
     end
 
+    trait :onboarded_step_4 do
+      onboarding_step { 4 }
+      onboarding_completed_at { nil }
+    end
+
     trait :with_profile do
       after(:create) do |user|
         user.profile.update!(gender: "female", color_tone: "warm", favorite_colors: %w[navy])

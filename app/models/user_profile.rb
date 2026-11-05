@@ -25,6 +25,7 @@ class UserProfile < ApplicationRecord
   validates :body_type, inclusion: { in: BODY_TYPES }, allow_nil: true
   validates :avatar_status, inclusion: { in: AVATAR_STATUSES }
   validate :favorite_and_avoided_disjoint
+  validate :birthday_format_valid
 
   private
 
@@ -33,5 +34,14 @@ class UserProfile < ApplicationRecord
     return if overlap.empty?
 
     errors.add(:base, "A color can't be both favorite and avoided")
+  end
+
+  def birthday_format_valid
+    raw = birthday_before_type_cast
+    return if raw.blank?
+    return if raw.is_a?(Date)
+    Date.parse(raw.to_s)
+  rescue Date::Error, TypeError, ArgumentError
+    errors.add(:birthday, "Use YYYY-MM-DD format")
   end
 end

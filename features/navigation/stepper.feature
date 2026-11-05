@@ -23,7 +23,7 @@ Feature: Navigation stepper
     When I visit "/wardrobe"
     Then the "Profile" stepper step should be complete
 
-  @mobile
+  @mobile @javascript
   Scenario: Mobile tab bar is visible on narrow screens
     When I visit "/wardrobe"
     Then I should see the mobile tab bar

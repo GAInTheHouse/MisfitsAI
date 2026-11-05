@@ -6,12 +6,14 @@ Feature: Profile
   Background:
     Given I am signed in as an onboarded user
 
+  @javascript
   Scenario: Save personal section
     Given I visit "/profile"
     When I choose gender "Female" in the personal section
     And I click "Save" in the personal section
     Then I should see "Saved"
 
+  @javascript
   Scenario: Save measurements
     Given I visit "/profile"
     When I fill in "Height (cm)" with "170"
@@ -19,12 +21,14 @@ Feature: Profile
     And I click "Save" in the measurements section
     Then I should see "Saved"
 
+  @javascript
   Scenario: A color cannot be both favorite and avoided
     Given I visit "/profile"
     When I select "Navy" as both a favorite and an avoided color
     And I click "Save" in the style section
     Then I should see "A color can't be both favorite and avoided"
 
+  @javascript
   Scenario: Save sizes
     Given I visit "/profile"
     When I select "M" as my top size

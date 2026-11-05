@@ -41,13 +41,13 @@ Then("the response should include {string}") do |key|
   expect(body).to have_key(key)
 end
 
-Then("{string} should be {int}") do |key, value|
-  body = JSON.parse(page.body)
-  expect(body[key]).to eq(value)
-end
-
 Then("{string} should be {word}") do |key, value|
   body = JSON.parse(page.body)
-  expected = value == "true" ? true : (value == "false" ? false : value)
+  expected = case value
+             when /\A-?\d+\z/ then value.to_i
+             when "true" then true
+             when "false" then false
+             else value
+             end
   expect(body[key]).to eq(expected)
 end

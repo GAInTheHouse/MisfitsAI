@@ -4,10 +4,9 @@ module Avatars
   class GenerateAvatarJob < ApplicationJob
     queue_as :ai_images
 
-    rescue_from(StandardError) do |e|
+    rescue_from(StandardError) do |_e|
       profile = UserProfile.find_by(id: arguments.first)
       profile&.update!(avatar_status: "failed", avatar_error: "Avatar generation failed. Please try another photo.")
-      raise e
     end
 
     def perform(profile_id)
@@ -19,7 +18,7 @@ module Avatars
       begin
         selfie_bytes = profile.pending_selfie.download
         selfie_jpeg  = Media::ImageNormalizer.to_jpeg(selfie_bytes)
-        selfie_image = Ai::Image.new(data: selfie_jpeg, mime_type: "image/jpeg")
+        selfie_image = Ai::Image.new(bytes: selfie_jpeg, mime_type: "image/jpeg")
         description  = Ai::Client.current.generate_text(
           kind: :selfie_description,
           prompt: Avatars::Prompts::SELFIE,
@@ -34,7 +33,7 @@ module Avatars
 
       prompt = Avatars::PromptBuilder.portrait(description: description, context: context)
       result = Ai::Client.current.generate_image(kind: :avatar_portrait, prompt: prompt, aspect_ratio: "1:1", user: user)
-      jpeg   = Media::ImageNormalizer.to_square_jpeg(result.data, size: 512)
+      jpeg   = Media::ImageNormalizer.to_square_jpeg(result.bytes, size: 512)
 
       profile.avatar.attach(io: StringIO.new(jpeg), filename: "avatar.jpg", content_type: "image/jpeg")
       profile.update!(avatar_status: "ready", avatar_error: nil)

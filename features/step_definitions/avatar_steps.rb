@@ -57,8 +57,8 @@ end
 
 When("I generate a look for Monday's outfit") do
   rec = @user.week_plans.first.outfit_recommendations.order(:date).first
-  post outfit_previews_path(outfit_id: rec.id)
-  follow_redirect! if response.redirect?
+  page.driver.browser.post(outfit_previews_path(outfit_id: rec.id))
+  page.driver.browser.follow_redirect! if page.driver.browser.last_response.redirect?
 end
 
 Then("Monday's outfit should have a preview image") do

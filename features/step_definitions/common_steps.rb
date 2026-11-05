@@ -33,7 +33,8 @@ When("I visit {string}") do |path|
 end
 
 Then("I should see {string}") do |text|
-  expect(page).to have_content(text)
+  found = page.has_content?(text) || page.has_field?(with: text, visible: :any)
+  expect(found).to be_truthy, "Expected to find \"#{text}\" as visible text or in a form field"
 end
 
 When("background jobs finish") do

@@ -23,7 +23,7 @@
   </div>
 
   <div>
-    <label class="block text-sm font-medium mb-2" for="birthday">Date of birth <span class="text-[var(--muted)] font-normal">(optional)</span></label>
+    <label class="block text-sm font-medium mb-2" for="birthday">Birthday <span class="text-[var(--muted)] font-normal">(optional)</span></label>
     <input type="date" name="user_profile[birthday]" id="birthday"
       value="<%= profile.birthday&.to_fs(:html) %>"
       max="<%= Date.current.to_fs(:html) %>"
@@ -56,6 +56,6 @@
   </details>
 
   <div class="flex justify-end pt-2">
-    <button type="submit" class="btn-primary px-6 py-2">Next →</button>
+    <button type="submit" class="btn-primary px-6 py-2">Continue</button>
   </div>
 <% end %>

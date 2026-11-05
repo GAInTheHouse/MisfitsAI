@@ -3,6 +3,9 @@ Feature: Onboarding
   I want a guided setup
   So that I get useful outfits on day one
 
+  Background:
+    Given the "onboarding" feature is enabled
+
   @javascript
   Scenario: Complete onboarding with the starter catalog
     Given I have just signed up with email "new@example.com"
@@ -10,6 +13,7 @@ Feature: Onboarding
     When I choose gender "Female" and continue
     And I choose aesthetics "Casual" and "Minimalist" and continue
     And I select "White T-shirt", "Blue Jeans" and "White Sneakers" from the catalog
+    And I continue through step 2
     And I click "Build My Wardrobe"
     Then I should see "Your first week of outfits"
     When background jobs finish
@@ -26,13 +30,16 @@ Feature: Onboarding
     Given I have just signed up with email "empty@example.com"
     When I continue through step 0
     And I continue through step 1
-    Then "Build My Wardrobe" should be disabled
+    And I continue through step 2
+    Then the "Build My Wardrobe" button should be disabled
 
+  @javascript
   Scenario: A custom item can be added in step 3
     Given I have just signed up with email "custom@example.com"
     When I continue through step 0
     And I continue through step 1
     And I select "White T-shirt" and "Blue Jeans" from the catalog
+    And I continue through step 2
     And I click "Add custom item"
     And I fill in the custom item name "Linen Shirt" with category "Top"
     Then I should see "Linen Shirt"

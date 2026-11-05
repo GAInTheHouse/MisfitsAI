@@ -4,7 +4,8 @@ Feature: Outfit on me (avatar outfit preview)
   So that I can visualize how they look
 
   Background:
-    Given I am signed in as an onboarded user
+    Given the "avatar" feature is enabled
+    And I am signed in as an onboarded user
 
   Scenario: On Me tab is hidden without an avatar
     Given I have outfit recommendations for this week

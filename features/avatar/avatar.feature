@@ -4,7 +4,8 @@ Feature: Avatar generation
   So that I can visualize outfits on myself
 
   Background:
-    Given I am signed in as an onboarded user
+    Given the "avatar" feature is enabled
+    And I am signed in as an onboarded user
 
   Scenario: Upload a selfie and the avatar appears
     Given I visit "/profile"
