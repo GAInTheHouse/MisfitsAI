@@ -673,7 +673,7 @@ DEPENDENCIES
   propshaft
   puma (>= 5.0)
   rack-attack
-  rails (~> 8.0.5, >= 8.0.5.1)
+  rails (~> 8.0.5, >= 8.0.5.2)
   rspec-rails
   rubocop-rails-omakase
   ruby-vips
