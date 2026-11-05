@@ -1,0 +1,26 @@
+<h1 class="text-2xl font-display mb-6">Profile</h1>
+
+<div class="space-y-6">
+  <%= turbo_frame_tag "profile_personal" do %>
+    <%= render "profiles/personal", profile: @profile %>
+  <% end %>
+
+  <%= turbo_frame_tag "profile_measurements" do %>
+    <%= render "profiles/measurements", measurement: @measurement %>
+  <% end %>
+
+  <%= turbo_frame_tag "profile_style" do %>
+    <%= render "profiles/style", profile: @profile %>
+  <% end %>
+
+  <%= turbo_frame_tag "profile_sizes" do %>
+    <%= render "profiles/sizes", profile: @profile %>
+  <% end %>
+
+  <% if Feature.enabled?(:avatar) %>
+    <%= turbo_stream_from current_user, :avatar %>
+    <%= turbo_frame_tag "profile_avatar", src: avatar_path do %>
+      <%= render "avatars/avatar_section", profile: @profile %>
+    <% end %>
+  <% end %>
+</div>

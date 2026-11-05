@@ -4,6 +4,7 @@ class UserProfile < ApplicationRecord
   belongs_to :user
 
   has_one_attached :avatar
+  has_one_attached :pending_selfie
 
   GENDERS = %w[female male other].freeze
   SKIN_TONES = %w[very_light light medium_light medium medium_dark dark].freeze

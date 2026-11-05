@@ -1,0 +1,80 @@
+<h1 class="text-2xl font-semibold mb-2">Review your wardrobe</h1>
+<p class="text-[var(--muted)] mb-6">Edit details for each item, then build your wardrobe.</p>
+
+<%= form_with url: onboarding_path, method: :patch,
+      data: { controller: "shared--nested-rows" },
+      class: "w-full space-y-4" do |f| %>
+
+  <% if flash[:alert].present? %>
+    <p class="text-red-600 text-sm"><%= flash[:alert] %></p>
+  <% end %>
+
+  <div id="review-rows" class="space-y-3">
+    <% catalog_ids.each_with_index do |cat_id, idx| %>
+      <% item = Options.fetch(:starter_catalog).map(&:stringify_keys).find { |i| i["id"] == cat_id } %>
+      <% next unless item %>
+      <div class="flex flex-wrap gap-2 items-center rounded-xl border border-[var(--line)] p-3">
+        <input type="hidden" name="reviewed_items[<%= idx %>][id]" value="<%= item["id"] %>" />
+        <input type="text" name="reviewed_items[<%= idx %>][name]" value="<%= item["name"] %>"
+          placeholder="Name" class="input flex-1 min-w-32" />
+        <input type="text" name="reviewed_items[<%= idx %>][color]" value="<%= item["color"] %>"
+          placeholder="Color" class="input w-24" />
+        <input type="text" name="reviewed_items[<%= idx %>][size]" value=""
+          placeholder="Size" class="input w-20" />
+        <select name="reviewed_items[<%= idx %>][formality]" class="input w-32">
+          <% [["casual","Casual"],["smart_casual","Smart casual"],["business","Business"],["formal","Formal"]].each do |val, lbl| %>
+            <option value="<%= val %>" <%= "selected" if item["formality"] == val %>><%= lbl %></option>
+          <% end %>
+        </select>
+        <select name="reviewed_items[<%= idx %>][seasonality]" class="input w-28">
+          <% [["all_season","All season"],["hot","Hot"],["mild","Mild"],["cold","Cold"]].each do |val, lbl| %>
+            <option value="<%= val %>" selected><%= lbl %></option>
+          <% end %>
+        </select>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Custom item rows appended by Stimulus %>
+  <div id="custom-rows" class="space-y-3"></div>
+
+  <%# Template for custom items %>
+  <template data-shared--nested-rows-target="template">
+    <div class="flex flex-wrap gap-2 items-center rounded-xl border border-[var(--line)] p-3"
+         data-shared--nested-rows-target="row">
+      <input type="text" name="custom_items[__IDX__][name]" placeholder="Item name"
+        class="input flex-1 min-w-32" />
+      <input type="text" name="custom_items[__IDX__][color]" placeholder="Color" class="input w-24" />
+      <input type="text" name="custom_items[__IDX__][size]" placeholder="Size" class="input w-20" />
+      <select name="custom_items[__IDX__][category]" class="input w-28">
+        <option value="">Category</option>
+        <% [["top","Top"],["bottom","Bottom"],["shoes","Shoes"],["outerwear","Outerwear"],["accessory","Accessory"]].each do |val, lbl| %>
+          <option value="<%= val %>"><%= lbl %></option>
+        <% end %>
+      </select>
+      <select name="custom_items[__IDX__][formality]" class="input w-32">
+        <% [["casual","Casual"],["smart_casual","Smart casual"],["business","Business"],["formal","Formal"]].each do |val, lbl| %>
+          <option value="<%= val %>"><%= lbl %></option>
+        <% end %>
+      </select>
+      <select name="custom_items[__IDX__][seasonality]" class="input w-28">
+        <% [["all_season","All season"],["hot","Hot"],["mild","Mild"],["cold","Cold"]].each do |val, lbl| %>
+          <option value="<%= val %>"><%= lbl %></option>
+        <% end %>
+      </select>
+      <button type="button" class="text-[var(--muted)] hover:text-red-600 text-sm"
+        data-action="click->shared--nested-rows#remove">Remove</button>
+    </div>
+  </template>
+
+  <button type="button" class="btn-ghost text-sm"
+    data-action="click->shared--nested-rows#add"
+    data-container="custom-rows">
+    + Add custom item
+  </button>
+
+  <div class="flex justify-between pt-4">
+    <%= button_to "← Back", back_onboarding_path, method: :post, class: "btn-ghost px-4 py-2" %>
+    <button type="submit" class="btn-primary px-6 py-2">Build My Wardrobe</button>
+  </div>
+<% end %>

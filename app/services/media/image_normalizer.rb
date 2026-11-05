@@ -14,6 +14,14 @@ module Media
       mime
     end
 
+    def self.to_jpeg(bytes)
+      sniff!(bytes)
+      require "vips"
+      image = Vips::Image.new_from_buffer(bytes, "")
+      image = image.colourspace(:srgb) if image.bands == 4
+      image.jpegsave_buffer(Q: 92)
+    end
+
     def self.to_square_jpeg(bytes, size: 512, background: "#ffffff")
       sniff!(bytes)
       require "vips"

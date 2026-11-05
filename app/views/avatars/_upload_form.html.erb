@@ -1,0 +1,14 @@
+<%= form_with url: avatar_path, method: :post, multipart: true,
+      data: { turbo: false } do |f| %>
+  <div class="flex flex-col gap-3">
+    <label class="block text-sm font-medium text-[var(--muted)]">
+      Upload a selfie — we'll generate an illustrated avatar
+    </label>
+    <input type="file" name="selfie" accept="image/*"
+      class="block text-sm text-[var(--muted)] file:mr-3 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--surface-2)] file:cursor-pointer hover:file:bg-[var(--surface-3)]" />
+    <% if flash[:avatar_error].present? %>
+      <p class="text-red-600 text-sm"><%= flash[:avatar_error] %></p>
+    <% end %>
+    <button type="submit" class="btn-primary w-fit py-1.5 px-4 text-sm">Generate avatar</button>
+  </div>
+<% end %>

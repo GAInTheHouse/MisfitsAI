@@ -1,0 +1,10 @@
+<% content_for :title, "My Avatar" %>
+
+<% if Feature.enabled?(:avatar) %>
+  <%= turbo_stream_from current_user, :avatar %>
+<% end %>
+
+<div class="max-w-lg mx-auto px-4 py-8">
+  <h1 class="text-xl font-semibold mb-6">My Avatar</h1>
+  <%= render "avatars/avatar_section", profile: current_user.profile %>
+</div>
