@@ -15,7 +15,7 @@ class OutfitPreviewsController < ApplicationController
 
     avatar_check = profile.avatar.attached? ? profile.avatar.blob.checksum : "none"
     cache_key    = Digest::SHA256.hexdigest(
-      [avatar_check, *@rec.garments_in_display_order.map(&:id)].join(":")
+      [ avatar_check, *@rec.garments_in_display_order.map(&:id) ].join(":")
     )
 
     if @rec.preview_status == "ready" && @rec.preview_cache_key == cache_key

@@ -46,8 +46,8 @@ module Analytics
 
       response = client.run_report(
         property: "properties/#{property_id}",
-        date_ranges: [{ start_date: "#{@period_days}daysAgo", end_date: "today" }],
-        metrics: [{ name: "activeUsers" }, { name: "screenPageViews" }]
+        date_ranges: [ { start_date: "#{@period_days}daysAgo", end_date: "today" } ],
+        metrics: [ { name: "activeUsers" }, { name: "screenPageViews" } ]
       )
 
       row = response.rows.first
@@ -97,7 +97,7 @@ module Analytics
       rows = resp.body.force_encoding("UTF-8").split("\n").reject(&:blank?)
       skip_header = ActiveModel::Type::Boolean.new.cast(ENV.fetch("WAITLIST_CSV_SKIP_HEADER", "true"))
       count = rows.size
-      skip_header ? [count - 1, 0].max : count
+      skip_header ? [ count - 1, 0 ].max : count
     rescue StandardError
       nil
     end

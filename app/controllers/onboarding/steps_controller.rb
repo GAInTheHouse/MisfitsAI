@@ -26,7 +26,7 @@ module Onboarding
     end
 
     def back
-      step = [current_user.onboarding_step - 1, 0].max
+      step = [ current_user.onboarding_step - 1, 0 ].max
       current_user.update!(onboarding_step: step)
       redirect_to onboarding_path
     end

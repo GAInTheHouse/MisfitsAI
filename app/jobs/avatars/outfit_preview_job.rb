@@ -16,7 +16,7 @@ module Avatars
       user    = rec.week_plan.user
 
       avatar_check = profile.avatar.attached? ? profile.avatar.blob.checksum : "none"
-      cache_key    = Digest::SHA256.hexdigest([avatar_check, *rec.garments_in_display_order.map(&:id)].join(":"))
+      cache_key    = Digest::SHA256.hexdigest([ avatar_check, *rec.garments_in_display_order.map(&:id) ].join(":"))
 
       if rec.preview_status == "ready" && rec.preview_cache_key == cache_key
         broadcast_preview(rec, user)
@@ -59,7 +59,7 @@ module Avatars
     end
 
     def try_imagen_subject(rec, profile, user, outfit_desc)
-      return [nil, nil] unless profile.avatar.attached?
+      return [ nil, nil ] unless profile.avatar.attached?
 
       avatar_jpeg   = profile.avatar.download
       avatar_image  = Ai::Image.new(data: avatar_jpeg, mime_type: "image/jpeg")
@@ -68,13 +68,13 @@ module Avatars
         kind: :outfit_preview_subject, prompt: prompt, subject: avatar_image, aspect_ratio: "9:16", user: user
       )
       jpeg = Media::ImageNormalizer.to_jpeg(result.data)
-      [jpeg, "imagen_subject"]
+      [ jpeg, "imagen_subject" ]
     rescue Ai::Error, StandardError
-      [nil, nil]
+      [ nil, nil ]
     end
 
     def try_gemini_image(rec, profile, user, outfit_desc)
-      return [nil, nil] unless profile.avatar.attached?
+      return [ nil, nil ] unless profile.avatar.attached?
 
       avatar_jpeg    = profile.avatar.download
       avatar_img     = Ai::Image.new(data: avatar_jpeg, mime_type: "image/jpeg")
@@ -84,20 +84,20 @@ module Avatars
         Ai::Image.new(data: g.image.download, mime_type: "image/jpeg")
       end
 
-      images = [avatar_img, *garment_images]
+      images = [ avatar_img, *garment_images ]
       prompt = Avatars::Prompts.outfit_gemini(outfit_desc: outfit_desc, n_garment_images: garment_images.size)
       result = Ai::Client.current.generate_image_multimodal(
         kind: :outfit_preview_gemini, prompt: prompt, images: images, user: user
       )
       jpeg = Media::ImageNormalizer.to_jpeg(result.data)
-      [jpeg, "gemini_image"]
+      [ jpeg, "gemini_image" ]
     rescue Ai::Error, StandardError
-      [nil, nil]
+      [ nil, nil ]
     end
 
     def broadcast_preview(rec, user)
       Turbo::StreamsChannel.broadcast_replace_to(
-        [user, :planner],
+        [ user, :planner ],
         target: "on_me_#{rec.id}",
         partial: "outfit_previews/preview",
         locals: { rec: rec }

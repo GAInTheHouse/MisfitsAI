@@ -23,7 +23,7 @@ module Avatars
         description  = Ai::Client.current.generate_text(
           kind: :selfie_description,
           prompt: Avatars::Prompts::SELFIE,
-          images: [selfie_image],
+          images: [ selfie_image ],
           temperature: 0.25,
           max_output_tokens: 4096,
           user: user
@@ -40,7 +40,7 @@ module Avatars
       profile.update!(avatar_status: "ready", avatar_error: nil)
 
       Turbo::StreamsChannel.broadcast_replace_to(
-        [user, :avatar],
+        [ user, :avatar ],
         target: "avatar_section",
         partial: "avatars/avatar_section",
         locals: { profile: profile }

@@ -24,7 +24,7 @@ When("I upload an oversized file as my avatar selfie") do
   # generate in-memory > 15 MB
   large = StringIO.new("x" * (16 * 1024 * 1024))
   large.rewind
-  large_path = Tempfile.new(["oversized", ".jpg"]).tap do |f|
+  large_path = Tempfile.new([ "oversized", ".jpg" ]).tap do |f|
     f.write(large.read)
     f.flush
   end.path
@@ -71,7 +71,7 @@ Given("Monday's outfit already has a preview with the current cache key") do
   png = File.read(Rails.root.join("spec/fixtures/ai/outfit_preview_gemini.png"), encoding: "binary")
   rec.preview_image.attach(io: StringIO.new(png), filename: "preview.png", content_type: "image/png")
   avatar_check = @user.profile.avatar.attached? ? @user.profile.avatar.blob.checksum : "none"
-  key = Digest::SHA256.hexdigest([avatar_check, *rec.garments_in_display_order.map(&:id)].join(":"))
+  key = Digest::SHA256.hexdigest([ avatar_check, *rec.garments_in_display_order.map(&:id) ].join(":"))
   rec.update!(preview_status: "ready", preview_cache_key: key)
 end
 
