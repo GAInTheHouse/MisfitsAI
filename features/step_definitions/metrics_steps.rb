@@ -44,10 +44,10 @@ end
 Then("{string} should be {word}") do |key, value|
   body = JSON.parse(page.body)
   expected = case value
-             when /\A-?\d+\z/ then value.to_i
-             when "true" then true
-             when "false" then false
-             else value
-             end
+  when /\A-?\d+\z/ then value.to_i
+  when "true" then true
+  when "false" then false
+  else value
+  end
   expect(body[key]).to eq(expected)
 end
