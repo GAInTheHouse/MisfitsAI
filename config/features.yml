@@ -1,8 +1,8 @@
 default: &default
-  onboarding: false
-  profile: false
-  avatar: false
-  outfit_preview: false
+  onboarding: true
+  profile: true
+  avatar: true
+  outfit_preview: true
   photo_intake: true
   receipts: true
   calendar_sync: true
@@ -12,6 +12,7 @@ development:
 
 test:
   <<: *default
+  onboarding: false
 
 production:
   <<: *default

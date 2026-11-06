@@ -28,6 +28,10 @@ Given("the {string} feature is disabled") do |flag|
   ENV["FEATURE_#{flag.upcase}"] = "false"
 end
 
+Given("the {string} feature is enabled") do |flag|
+  ENV["FEATURE_#{flag.upcase}"] = "true"
+end
+
 When("I open the {string} tab") do |label|
   find("[role=tab]", exact_text: label).click
   expect(page).to have_css("[role=tab][aria-selected=true]", exact_text: label)

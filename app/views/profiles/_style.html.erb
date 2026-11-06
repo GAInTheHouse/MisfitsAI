@@ -1,0 +1,89 @@
+<% skin_tones = [
+  ["very_light", "Very Light", "#FDDBB4"], ["light", "Light", "#F5C5A3"],
+  ["medium_light", "Medium Light", "#D4956A"], ["medium", "Medium", "#B46A3C"],
+  ["medium_dark", "Medium Dark", "#8D4A24"], ["dark", "Dark", "#4A2515"]
+] %>
+<% color_swatches = [
+  ["black", "#111111"], ["white", "#F5F5F0"], ["grey", "#9E9E9E"],
+  ["navy", "#1A2E5C"], ["blue", "#2979FF"], ["green", "#2E7D32"],
+  ["olive", "#6D6E32"], ["brown", "#795548"], ["beige", "#D4B896"],
+  ["red", "#C62828"], ["pink", "#E91E8C"], ["yellow", "#F9A825"]
+] %>
+
+<div class="card">
+  <h2 class="font-semibold mb-4">Style</h2>
+  <%= form_with url: profile_path, method: :patch,
+        data: { controller: "shared--dirty-form", turbo_frame: "profile_style" } do |f| %>
+    <%= hidden_field_tag :section, "style" %>
+
+    <% if profile.errors.any? %>
+      <div class="mb-3 text-red-600 text-sm"><%= profile.errors.full_messages.to_sentence %></div>
+    <% end %>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-2">Skin tone</label>
+      <div class="flex flex-wrap gap-2">
+        <% skin_tones.each do |key, label, hex| %>
+          <label class="cursor-pointer text-xs text-center w-14" title="<%= label %>">
+            <input type="radio" name="user_profile[skin_tone]" value="<%= key %>"
+              class="sr-only" <%= "checked" if profile.skin_tone == key %>
+              data-action="change->shared--dirty-form#changed" />
+            <span class="block w-8 h-8 rounded-full border-2 mx-auto mb-1"
+              style="background:<%= hex %>; border-color:<%= profile.skin_tone == key ? '#000' : '#ddd' %>;"></span>
+            <%= label %>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-2">Color tone</label>
+      <div class="flex gap-3">
+        <% [["warm","Warm"],["cool","Cool"],["neutral","Neutral"]].each do |key, lbl| %>
+          <label class="pill cursor-pointer">
+            <input type="radio" name="user_profile[color_tone]" value="<%= key %>"
+              class="sr-only" <%= "checked" if profile.color_tone == key %>
+              data-action="change->shared--dirty-form#changed" />
+            <span><%= lbl %></span>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-2">Favorite colors</label>
+      <div class="flex flex-wrap gap-2">
+        <% color_swatches.each do |key, hex| %>
+          <label class="cursor-pointer text-xs text-center w-10" title="<%= key.humanize %> (favorite)">
+            <input type="checkbox" name="user_profile[favorite_colors][]" value="<%= key %>"
+              class="sr-only" <%= "checked" if Array(profile.favorite_colors).include?(key) %>
+              data-action="change->shared--dirty-form#changed" />
+            <span class="block w-7 h-7 rounded-full border-2 mx-auto"
+              style="background:<%= hex %>; border-color:<%= Array(profile.favorite_colors).include?(key) ? '#000' : '#ddd' %>;"></span>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-2">Avoided colors</label>
+      <div class="flex flex-wrap gap-2">
+        <% color_swatches.each do |key, hex| %>
+          <label class="cursor-pointer text-xs text-center w-10" title="<%= key.humanize %> (avoided)">
+            <input type="checkbox" name="user_profile[avoided_colors][]" value="<%= key %>"
+              class="sr-only" <%= "checked" if Array(profile.avoided_colors).include?(key) %>
+              data-action="change->shared--dirty-form#changed" />
+            <span class="block w-7 h-7 rounded-full border-2 mx-auto"
+              style="background:<%= hex %>; border-color:<%= Array(profile.avoided_colors).include?(key) ? '#000' : '#ddd' %>;"></span>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <div data-shared--dirty-form-target="bar" hidden class="flex gap-2 pt-2">
+      <button type="submit" class="btn-primary py-1.5 px-4 text-sm">Save</button>
+      <button type="button" class="btn-ghost py-1.5 px-4 text-sm"
+        data-action="click->shared--dirty-form#discard">Discard</button>
+    </div>
+  <% end %>
+</div>

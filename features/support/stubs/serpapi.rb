@@ -6,7 +6,7 @@ module SerpapiStubs
   ENDPOINT = %r{\Ahttps://serpapi\.com/search\.json}
 
   def stub_serpapi(results:, page_two: [])
-    ENV["SERPAPI_KEY"] ||= "test-serpapi-key"
+    ENV["SERPAPI_KEY"] = "test-serpapi-key"
     stub_request(:get, ENDPOINT).with(query: hash_including("engine" => "google_images"))
                                 .to_return(serpapi_json(results))
     # Registered last so it wins for page 2 (ijn=1), which the backfill may request.
@@ -15,12 +15,12 @@ module SerpapiStubs
   end
 
   def stub_serpapi_error(status: 500)
-    ENV["SERPAPI_KEY"] ||= "test-serpapi-key"
+    ENV["SERPAPI_KEY"] = "test-serpapi-key"
     stub_request(:get, ENDPOINT).to_return(status: status, body: { error: "Upstream failure" }.to_json)
   end
 
   def stub_serpapi_timeout
-    ENV["SERPAPI_KEY"] ||= "test-serpapi-key"
+    ENV["SERPAPI_KEY"] = "test-serpapi-key"
     stub_request(:get, ENDPOINT).to_timeout
   end
 

@@ -3,6 +3,7 @@
 require "cucumber/rails"
 require "webmock/cucumber"
 require "capybara/cuprite"
+require "rspec/mocks"
 
 WebMock.disable_net_connect!(allow_localhost: true)
 
@@ -25,17 +26,28 @@ World(FactoryBot::Syntax::Methods)
 World(Warden::Test::Helpers)
 World(ActiveJob::TestHelper)
 World(ActiveSupport::Testing::TimeHelpers)
+World(RSpec::Mocks::ExampleMethods)
 
 OmniAuth.config.test_mode = true
+
+# Ensure Devise registers its Warden session serializers before any test runs.
+# Without this, user_serialize is undefined and Warden stores the full User
+# object in the session instead of [[uuid], salt], causing ArgumentError in
+# serialize_from_session when the session key is splatted.
+Rails.application.routes.finalize!
 
 Before do
   Ai::Client::Fake.reset!
   Warden.test_mode!
+  RSpec::Mocks.setup
 end
 
 After do
+  RSpec::Mocks.verify
+  RSpec::Mocks.teardown
   Warden.test_reset!
   travel_back
+  clear_enqueued_jobs
 end
 
 Before("@mobile") do
