@@ -1,0 +1,40 @@
+<% content_for :title, "Your Outfits" %>
+
+<div class="max-w-3xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-semibold mb-6">Your Outfits</h1>
+
+  <% if @outfits.empty? %>
+    <div class="text-center py-16 text-[var(--muted)]">
+      <p class="mb-4">No outfits yet. Complete the calendar step to get recommendations.</p>
+      <%= link_to "Go to Calendar", week_plan_path, class: "btn-primary px-5 py-2" %>
+    </div>
+  <% else %>
+    <div class="space-y-4">
+      <% @outfits.each do |rec| %>
+        <div class="rounded-xl border border-[var(--line)] p-4 flex gap-4 items-start">
+          <div class="text-sm font-medium w-24 shrink-0 text-[var(--muted)]">
+            <%= rec.date.strftime("%a, %b %-d") %>
+          </div>
+
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap gap-2 mb-3">
+              <% rec.garments_in_display_order.each do |g| %>
+                <%= turbo_frame_tag dom_id(g, :thumb), class: "w-12 h-12 rounded-lg overflow-hidden border border-[var(--line)]" do %>
+                  <%= render "garments/thumb", garment: g %>
+                <% end %>
+              <% end %>
+            </div>
+
+            <% if rec.explanation.present? %>
+              <p class="text-xs text-[var(--muted)] mb-3"><%= rec.explanation %></p>
+            <% end %>
+
+            <%= turbo_frame_tag "on_me_#{rec.id}" do %>
+              <%= render "outfit_previews/preview", rec: rec %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>

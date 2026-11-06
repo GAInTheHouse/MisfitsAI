@@ -1,1 +1,14 @@
-<%# Phase 4 fills this in; Phase 1 leaves it empty per design doc 10.3 %>
+<% if user_signed_in? %>
+  <% progress = Navigation.build(current_user) %>
+  <div class="border-b px-4 py-2" style="border-color: var(--line); background: var(--panel-strong);">
+    <div class="mx-auto max-w-5xl flex items-center justify-center gap-6 text-sm">
+      <%= stepper_step("Wardrobe", :wardrobe, progress.wardrobe_complete, wardrobe_path) %>
+      <span class="text-[var(--muted)]">›</span>
+      <%= stepper_step("Calendar", :calendar, progress.calendar_complete, week_plan_path) %>
+      <span class="text-[var(--muted)]">›</span>
+      <%= stepper_step("Outfits", :outfits, progress.outfits_complete, outfits_path) %>
+      <span class="text-[var(--muted)]">›</span>
+      <%= stepper_step("Profile", :profile, true, profile_path) %>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,61 @@
+<h1 class="text-2xl font-semibold mb-2">Tell us about you</h1>
+<p class="text-[var(--muted)] mb-6">This helps us size and tailor your recommendations.</p>
+
+<%= form_with url: onboarding_path, method: :patch, class: "w-full space-y-6" do |f| %>
+  <% if profile.errors.any? %>
+    <div class="text-red-600 text-sm"><%= profile.errors.full_messages.to_sentence %></div>
+  <% end %>
+
+  <div>
+    <label class="block text-sm font-medium mb-2">I dress for</label>
+    <div class="flex gap-3">
+      <% [["female","Women's"], ["male","Men's"], ["other","Non-binary"]].each do |key, lbl| %>
+        <label class="pill cursor-pointer">
+          <input type="radio" name="user_profile[gender]" value="<%= key %>"
+            class="sr-only" <%= "checked" if profile.gender == key %> />
+          <span><%= lbl %></span>
+        </label>
+      <% end %>
+    </div>
+    <% if profile.errors[:gender].any? %>
+      <p class="text-red-600 text-xs mt-1"><%= profile.errors[:gender].first %></p>
+    <% end %>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-2" for="birthday">Birthday <span class="text-[var(--muted)] font-normal">(optional)</span></label>
+    <input type="date" name="user_profile[birthday]" id="birthday"
+      value="<%= profile.birthday&.to_fs(:html) %>"
+      max="<%= Date.current.to_fs(:html) %>"
+      class="input w-48" />
+  </div>
+
+  <details class="group">
+    <summary class="cursor-pointer text-sm font-medium text-[var(--muted)] list-none flex items-center gap-1">
+      <span class="group-open:hidden">+ Add measurements (optional)</span>
+      <span class="hidden group-open:inline">− Hide measurements</span>
+    </summary>
+    <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <% [
+        ["height_cm", "Height (cm)"],
+        ["weight_kg", "Weight (kg)"],
+        ["chest_cm",  "Chest / Bust (cm)"],
+        ["waist_cm",  "Waist (cm)"],
+        ["hips_cm",   "Hips (cm)"],
+        ["inseam_cm", "Inseam (cm)"]
+      ].each do |field, label| %>
+        <div>
+          <label class="block text-xs font-medium mb-1" for="m_<%= field %>"><%= label %></label>
+          <input type="number" step="0.1" min="0" max="300"
+            name="<%= field %>" id="m_<%= field %>"
+            value="<%= measurement.public_send(field) %>"
+            class="input w-full" />
+        </div>
+      <% end %>
+    </div>
+  </details>
+
+  <div class="flex justify-end pt-2">
+    <button type="submit" class="btn-primary px-6 py-2">Continue</button>
+  </div>
+<% end %>

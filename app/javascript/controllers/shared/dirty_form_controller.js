@@ -18,6 +18,6 @@ export default class extends Controller {
   }
 
   snapshot() {
-    return new FormData(this.element).toString()
+    return new URLSearchParams(new FormData(this.element)).toString()
   }
 }
