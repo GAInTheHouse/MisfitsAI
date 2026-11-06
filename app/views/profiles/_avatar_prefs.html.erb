@@ -1,0 +1,56 @@
+<div class="card">
+  <h2 class="font-semibold mb-4">Avatar preferences</h2>
+  <%= form_with url: profile_path, method: :patch,
+        data: { controller: "shared--dirty-form", turbo_frame: "profile_avatar_prefs" } do |f| %>
+    <%= hidden_field_tag :section, "avatar_prefs" %>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-2">Hair style</label>
+      <div class="flex flex-wrap gap-2">
+        <% [["short_straight","Short Straight"],["short_wavy","Short Wavy"],["long_straight","Long Straight"],
+            ["long_wavy","Long Wavy"],["curly_afro","Curly / Afro"],["bald","Bald / Shaved"]].each do |key, lbl| %>
+          <label class="pill cursor-pointer">
+            <input type="radio" name="user_profile[hair_style]" value="<%= key %>" class="sr-only"
+              <%= "checked" if profile.hair_style == key %>
+              data-action="change->shared--dirty-form#changed" />
+            <span><%= lbl %></span>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-2">Hair color</label>
+      <div class="flex flex-wrap gap-2">
+        <% UserProfile::HAIR_COLORS.each do |key| %>
+          <label class="pill cursor-pointer">
+            <input type="radio" name="user_profile[hair_color]" value="<%= key %>" class="sr-only"
+              <%= "checked" if profile.hair_color == key %>
+              data-action="change->shared--dirty-form#changed" />
+            <span><%= key.humanize %></span>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-2">Body type</label>
+      <div class="flex flex-wrap gap-2">
+        <% [["slim","Slim / Athletic"],["average","Average"],["broad","Broad / Plus"]].each do |key, lbl| %>
+          <label class="pill cursor-pointer">
+            <input type="radio" name="user_profile[body_type]" value="<%= key %>" class="sr-only"
+              <%= "checked" if profile.body_type == key %>
+              data-action="change->shared--dirty-form#changed" />
+            <span><%= lbl %></span>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <div data-shared--dirty-form-target="bar" hidden class="flex gap-2 pt-2">
+      <button type="submit" class="btn-primary py-1.5 px-4 text-sm">Save</button>
+      <button type="button" class="btn-ghost py-1.5 px-4 text-sm"
+        data-action="click->shared--dirty-form#discard">Discard</button>
+    </div>
+  <% end %>
+</div>

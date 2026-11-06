@@ -1,0 +1,36 @@
+<div class="card">
+  <h2 class="font-semibold mb-4">Body measurements <span class="text-[var(--muted)] text-xs font-normal">(optional)</span></h2>
+  <%= form_with url: measurements_path, method: :patch,
+        data: { controller: "shared--dirty-form", turbo_frame: "profile_measurements" } do |f| %>
+
+    <% if measurement.errors.any? %>
+      <div class="mb-3 text-red-600 text-sm"><%= measurement.errors.full_messages.to_sentence %></div>
+    <% end %>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+      <% [
+        ["height_cm", "Height (cm)"],
+        ["weight_kg", "Weight (kg)"],
+        ["chest_cm",  "Chest / Bust (cm)"],
+        ["waist_cm",  "Waist (cm)"],
+        ["hips_cm",   "Hips (cm)"],
+        ["inseam_cm", "Inseam (cm)"]
+      ].each do |field, label| %>
+        <div>
+          <label class="block text-xs font-medium mb-1" for="<%= field %>"><%= label %></label>
+          <input type="number" step="0.1" min="0" max="300"
+            name="body_measurement[<%= field %>]" id="<%= field %>"
+            value="<%= measurement.public_send(field) %>"
+            class="input w-full"
+            data-action="input->shared--dirty-form#changed" />
+        </div>
+      <% end %>
+    </div>
+
+    <div data-shared--dirty-form-target="bar" hidden class="flex gap-2 pt-2">
+      <button type="submit" class="btn-primary py-1.5 px-4 text-sm">Save</button>
+      <button type="button" class="btn-ghost py-1.5 px-4 text-sm"
+        data-action="click->shared--dirty-form#discard">Discard</button>
+    </div>
+  <% end %>
+</div>

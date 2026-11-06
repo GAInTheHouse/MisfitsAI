@@ -1,0 +1,27 @@
+<% content_for :title, "Outfit – #{@outfit.date.strftime('%A, %B %-d')}" %>
+
+<div class="max-w-2xl mx-auto px-4 py-8">
+  <%= link_to "← Back to outfits", outfits_path, class: "text-sm text-[var(--muted)] hover:underline mb-6 block" %>
+
+  <h1 class="text-2xl font-semibold mb-1"><%= @outfit.date.strftime("%A, %B %-d") %></h1>
+  <p class="text-sm text-[var(--muted)] mb-6 capitalize"><%= @outfit.event_type&.humanize %></p>
+
+  <div class="flex flex-wrap gap-3 mb-6">
+    <% @outfit.garments_in_display_order.each do |g| %>
+      <div class="w-20 h-20 rounded-xl border border-[var(--line)] overflow-hidden">
+        <%= render "garments/thumb", garment: g %>
+      </div>
+    <% end %>
+  </div>
+
+  <% if @outfit.explanation.present? %>
+    <p class="text-sm text-[var(--muted)] mb-6"><%= @outfit.explanation %></p>
+  <% end %>
+
+  <div class="border border-[var(--line)] rounded-xl p-4">
+    <h2 class="text-sm font-semibold mb-4">On Me</h2>
+    <%= turbo_frame_tag "on_me_#{@outfit.id}" do %>
+      <%= render "outfit_previews/preview", rec: @outfit %>
+    <% end %>
+  </div>
+</div>

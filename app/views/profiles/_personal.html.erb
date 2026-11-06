@@ -1,0 +1,41 @@
+<div class="card">
+  <h2 class="font-semibold mb-4">Personal</h2>
+  <%= form_with url: profile_path, method: :patch,
+        data: { controller: "shared--dirty-form", turbo_frame: "profile_personal" } do |f| %>
+    <%= hidden_field_tag :section, "personal" %>
+
+    <% if profile.errors.any? %>
+      <div class="mb-3 text-red-600 text-sm">
+        <%= profile.errors.full_messages.to_sentence %>
+      </div>
+    <% end %>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">Gender</label>
+      <div class="flex gap-3">
+        <% UserProfile::GENDERS.each do |g| %>
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="radio" name="user_profile[gender]" value="<%= g %>"
+              <%= "checked" if profile.gender == g %>
+              data-action="change->shared--dirty-form#changed" />
+            <%= g.humanize %>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1" for="birthday">Birthday</label>
+      <input type="date" name="user_profile[birthday]" id="birthday"
+        value="<%= profile.birthday %>"
+        class="input w-full max-w-xs"
+        data-action="change->shared--dirty-form#changed" />
+    </div>
+
+    <div data-shared--dirty-form-target="bar" hidden class="flex gap-2 pt-2">
+      <button type="submit" class="btn-primary py-1.5 px-4 text-sm">Save</button>
+      <button type="button" class="btn-ghost py-1.5 px-4 text-sm"
+        data-action="click->shared--dirty-form#discard">Discard</button>
+    </div>
+  <% end %>
+</div>

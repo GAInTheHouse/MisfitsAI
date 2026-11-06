@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 class CalendarSyncsController < ApplicationController
-  include ComingSoon
-  def create; head :not_implemented; end
+  before_action :authenticate_user!
+
+  def create
+    Planner::SyncCalendarJob.perform_later(current_user.id)
+    redirect_to week_plan_path, notice: "Calendar sync initiated."
+  end
 end

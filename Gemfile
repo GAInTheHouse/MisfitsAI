@@ -1,6 +1,6 @@
 source "https://rubygems.org"
 
-gem "rails", "~> 8.0.5", ">= 8.0.5.1"
+gem "rails", "~> 8.0.5", ">= 8.0.5.2"
 gem "json", "~> 3.1"
 gem "propshaft"
 gem "pg", "~> 1.1"
@@ -59,4 +59,5 @@ group :test do
   gem "shoulda-matchers"
   gem "database_cleaner-active_record"
   gem "simplecov", require: false
+  gem "climate_control"
 end
