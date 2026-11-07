@@ -26,12 +26,14 @@ Feature: Onboarding
     And I click "Continue"
     Then I should see "Use YYYY-MM-DD format"
 
-  Scenario: Build My Wardrobe is disabled with no catalog items
+  Scenario: Building an empty wardrobe shows a validation message
     Given I have just signed up with email "empty@example.com"
     When I continue through step 0
     And I continue through step 1
     And I continue through step 2
-    Then the "Build My Wardrobe" button should be disabled
+    And I click "Build My Wardrobe"
+    Then I should see "Add at least one item to continue."
+    And I should see "Review your wardrobe"
 
   @javascript
   Scenario: A custom item can be added in step 3

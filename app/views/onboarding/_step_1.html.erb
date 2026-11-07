@@ -67,7 +67,9 @@
   </div>
 
   <div class="flex justify-between pt-2">
-    <%= button_to "← Back", back_onboarding_path, method: :post, class: "btn-ghost px-4 py-2" %>
+    <%= link_to "← Back", back_onboarding_path,
+          data: { turbo_method: :post },
+          class: "btn-ghost px-4 py-2" %>
     <button type="submit" class="btn-primary px-6 py-2">Continue</button>
   </div>
 <% end %>
