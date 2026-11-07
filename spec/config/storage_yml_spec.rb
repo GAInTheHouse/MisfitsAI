@@ -103,6 +103,7 @@ RSpec.describe "config/storage.yml" do
     before do
       allow(Google::Auth).to receive(:get_application_default).and_return(Object.new) # the ADC used to call signBlob
       allow(Google::Apis::IamcredentialsV1::IAMCredentialsService).to receive(:new).and_return(iam)
+      allow(iam).to receive(:authorization).and_return(nil)
       allow(iam).to receive(:authorization=)
       allow(iam).to receive(:sign_service_account_blob) do |resource, _request|
         signed_resources << resource
