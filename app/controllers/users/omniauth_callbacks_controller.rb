@@ -29,9 +29,11 @@ module Users
       end
 
       sign_in_and_redirect user, event: :authentication
-    rescue StandardError
-      redirect_to root_path, alert: "Google sign-in was cancelled"
-    end
+    rescue StandardError => e
+      Rails.logger.error("Google sign-in failed: #{e.class}")
+      Rails.logger.error(e.backtrace&.first(10)&.join("\n"))
+      redirect_to root_path, alert: "Google sign-in failed"
+    end 
 
     def failure
       redirect_to root_path, alert: "Google sign-in was cancelled"
