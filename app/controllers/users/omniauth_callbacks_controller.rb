@@ -33,7 +33,7 @@ module Users
       Rails.logger.error("Google sign-in failed: #{e.class}")
       Rails.logger.error(e.backtrace&.first(10)&.join("\n"))
       redirect_to root_path, alert: "Google sign-in failed"
-    end 
+    end
 
     def failure
       redirect_to root_path, alert: "Google sign-in was cancelled"
