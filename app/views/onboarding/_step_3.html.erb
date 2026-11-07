@@ -28,7 +28,7 @@
         </select>
         <select name="reviewed_items[<%= idx %>][seasonality]" class="input w-28">
           <% [["all_season","All season"],["hot","Hot"],["mild","Mild"],["cold","Cold"]].each do |val, lbl| %>
-            <option value="<%= val %>" selected><%= lbl %></option>
+            <option value="<%= val %>" <%= "selected" if (item["seasonality"].presence || "all_season") == val %>><%= lbl %></option>
           <% end %>
         </select>
       </div>
@@ -74,7 +74,11 @@
   </button>
 
   <div class="flex justify-between pt-4">
-    <%= button_to "← Back", back_onboarding_path, method: :post, class: "btn-ghost px-4 py-2" %>
-    <button type="submit" class="btn-primary px-6 py-2" <%= "disabled" if catalog_ids.empty? %>>Build My Wardrobe</button>
+    <%= link_to "← Back", back_onboarding_path,
+          data: { turbo_method: :post },
+          class: "btn-ghost px-4 py-2" %>
+    <button type="submit" class="btn-primary px-6 py-2">
+      Build My Wardrobe
+    </button>
   </div>
 <% end %>
