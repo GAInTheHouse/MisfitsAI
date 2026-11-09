@@ -1,0 +1,9 @@
+<%# locals: week_plan, event_options (optional) %>
+<% event_options ||= ::Options.fetch(:event_types).map { |e| [ e[:key], e[:label] ] } %>
+<%= turbo_frame_tag "week_plan" do %>
+  <div class="space-y-3">
+    <% week_plan.week_events.order(:date).each do |event| %>
+      <%= render "week_plans/day_row", event:, event_options: %>
+    <% end %>
+  </div>
+<% end %>

@@ -1,0 +1,26 @@
+<%# locals: event, event_options %>
+<%= turbo_frame_tag dom_id(event) do %>
+  <div class="week-plan-row rounded-xl border border-[var(--line)] p-4 flex flex-col sm:flex-row sm:items-center gap-4 bg-[var(--panel-strong)]"
+              style="animation: weekRowIn 0.35s ease both; animation-delay: <%= event.date.wday * 40 %>ms;">
+    <div class="sm:w-36 shrink-0">
+      <div class="font-medium"><%= event.date.strftime("%A") %></div>
+      <div class="text-sm text-[var(--muted)]"><%= event.date.strftime("%b %-d") %></div>
+      <% if event.original_summary.present? %>
+        <p class="text-xs italic text-[var(--muted)] mt-1"><%= event.original_summary %></p>
+      <% end %>
+    </div>
+
+    <%= form_with model: event, url: week_plan_event_path(event), method: :patch,
+                  data: { controller: "shared--auto-submit", action: "change->shared--auto-submit#submit" },
+                  class: "flex-1" do |f| %>
+      <div class="flex flex-wrap gap-2" data-controller="shared--pill-group">
+        <% event_options.each do |value, label| %>
+          <label class="pill cursor-pointer" data-action="click->shared--pill-group#select">
+            <%= f.radio_button :event_type, value, checked: event.event_type == value, class: "sr-only" %>
+            <span><%= label %></span>
+          </label>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

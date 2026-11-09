@@ -1,0 +1,24 @@
+<%= render layout: "devise/shared/card", locals: { title: "Log in" } do %>
+  <%= form_for(resource, as: resource_name, url: session_path(resource_name), html: { class: "space-y-4" }) do |f| %>
+    <div class="space-y-1">
+      <%= f.label :email, class: "text-sm font-medium" %>
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", required: true, class: "input" %>
+    </div>
+
+    <div class="space-y-1">
+      <%= f.label :password, class: "text-sm font-medium" %>
+      <%= f.password_field :password, autocomplete: "current-password", required: true, class: "input" %>
+    </div>
+
+    <% if devise_mapping.rememberable? %>
+      <div class="flex items-center gap-2 text-sm">
+        <%= f.check_box :remember_me, class: "rounded border-[var(--line-strong)]" %>
+        <%= f.label :remember_me, class: "text-[var(--muted)]" %>
+      </div>
+    <% end %>
+
+    <%= f.submit "Log in", class: "btn-primary w-full" %>
+  <% end %>
+
+  <%= render "devise/shared/links" %>
+<% end %>

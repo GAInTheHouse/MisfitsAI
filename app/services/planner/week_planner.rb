@@ -2,12 +2,11 @@
 
 module Planner
   # Orchestrates week plan creation, demo week setup, and outfit generation.
-  # All methods are synchronous and fast: DB work only, no AI in the request.
   class WeekPlanner
     DEMO_WEEK = {
       0 => "work_meeting",
-      1 => "gym",
-      2 => "casual",
+      1 => "work_meeting",
+      2 => "gym",
       3 => "work_meeting",
       4 => "date_night",
       5 => "casual",
@@ -15,8 +14,15 @@ module Planner
     }.freeze
 
     def self.ensure_week!(user:)
-      start = Date.current.beginning_of_week(:monday)
-      user.week_plans.find_or_create_by!(week_start: start)
+      start = Week.current_start(user)
+      plan = user.week_plans.find_or_initialize_by(week_start: start)
+      if plan.new_record?
+        plan.save!
+        (0..6).each do |offset|
+          plan.week_events.create!(date: start + offset, event_type: "none")
+        end
+      end
+      plan
     end
 
     def self.apply_demo_week!(week_plan)
@@ -25,6 +31,7 @@ module Planner
         date = start + offset
         week_plan.week_events.find_or_initialize_by(date: date).tap do |e|
           e.event_type = event_type
+          e.original_summary = nil
           e.save!
         end
       end
@@ -33,27 +40,34 @@ module Planner
     end
 
     def self.generate!(user:, week_plan:)
-      engine = RecommendationEngine.new(user: user)
-      week_plan.outfit_recommendations.destroy_all
+      suggestions = RecommendationEngine.call(
+        garments: user.garments.with_attached_image.to_a,
+        events: week_plan.week_events.order(:date).to_a,
+        context: Profiles.for(user)
+      )
 
-      start = week_plan.week_start
-      (0..6).map do |offset|
-        date = start + offset
-        event = week_plan.week_events.find_by(date: date)
-        event_type = event&.event_type || "none"
-        garments = engine.call
-        top, bottom, shoes = garments
-        rec = week_plan.outfit_recommendations.create!(
-          date: date,
-          event_type: event_type,
-          top: top,
-          bottom: bottom,
-          shoes: shoes,
-          explanation_status: "pending",
-          preview_status: "none"
-        )
-        Planner::ExplainOutfitJob.perform_later(rec.id)
-        rec
+      OutfitRecommendation.transaction do
+        week_plan.outfit_recommendations.destroy_all
+        recs = suggestions.map do |s|
+          week_plan.outfit_recommendations.create!(
+            date: s.date,
+            event_type: s.event_type,
+            top: s.top,
+            bottom: s.bottom,
+            dress: s.dress,
+            outerwear: s.outerwear,
+            shoes: s.shoes,
+            explanation_status: "pending",
+            preview_status: "none"
+          )
+        end
+
+        ids = suggestions.flat_map { [ _1.top, _1.bottom, _1.dress, _1.outerwear, _1.shoes ] }.compact.map(&:id)
+        ids.tally.each { |id, n| Garment.where(id:).update_all([ "times_recommended = times_recommended + ?", n ]) }
+
+        week_plan.update!(generated_at: Time.current)
+        recs.each { ExplainOutfitJob.perform_later(_1.id) }
+        recs
       end
     end
   end
