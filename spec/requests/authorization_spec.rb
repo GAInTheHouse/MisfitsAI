@@ -54,6 +54,17 @@ RSpec.describe "Authorization", type: :request do
     end
   end
 
+  describe "planner (Phase 3)" do
+    let(:plan) { create(:week_plan, user: user_a) }
+    let!(:event) { create(:week_event, week_plan: plan) }
+
+    it "returns 404 for another user's week event update" do
+      patch week_plan_event_path(event), params: { week_event: { event_type: "gym" } }
+      expect(response).to have_http_status(:not_found)
+    end
+
+  end
+
   describe "receipts (Phase 2)" do
     let(:receipt) { create(:intake_batch, :receipt, user: user_a, status: "ready") }
     let!(:row) { create(:garment_draft, :ready, intake_batch: receipt) }

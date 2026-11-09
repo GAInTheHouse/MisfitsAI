@@ -40,6 +40,7 @@ class Garment < ApplicationRecord
   validates :times_recommended, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
 
   scope :visible, -> { where(hidden_from_recommendations: false) }
+  scope :with_attached_image, -> { preload(image_attachment: :blob) }
   scope :by_category, ->(cat) { where(category: cat) }
   scope :recent, -> { order(created_at: :desc) }
   # Preloads the image and its tracked variants so a grid of cards does not query per card.

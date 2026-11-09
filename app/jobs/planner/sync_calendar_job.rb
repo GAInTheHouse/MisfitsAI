@@ -2,7 +2,7 @@
 
 module Planner
   class SyncCalendarJob < ApplicationJob
-    queue_as :default
+    queue_as :calendar
 
     def perform(user_id)
       user = User.find_by(id: user_id)

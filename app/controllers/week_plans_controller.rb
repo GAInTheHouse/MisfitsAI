@@ -4,13 +4,26 @@ class WeekPlansController < ApplicationController
   before_action :authenticate_user!
 
   def show
-    @start_date = params[:start_date] ? Date.parse(params[:start_date]) : Date.current.beginning_of_week
-    @recommendations = Planner::RecommendationEngine.new(user: current_user, date: @start_date).call
+    @week_plan = Planner::WeekPlanner.ensure_week!(user: current_user)
+    @events = @week_plan.week_events.order(:date)
+    @recommendations = @week_plan.outfit_recommendations.order(:date).index_by(&:date)
+    @event_options = ::Options.fetch(:event_types).map { |e| [ e[:key], e[:label] ] }
   end
 
-  def create
-    engine = Planner::RecommendationEngine.new(user: current_user)
-    engine.call
-    redirect_to week_plan_path, notice: "Week plan generated."
+  def demo
+    plan = Planner::WeekPlanner.ensure_week!(user: current_user)
+    Planner::WeekPlanner.apply_demo_week!(plan)
+    redirect_to week_plan_path, notice: "Demo week applied."
+  end
+
+  def generate
+    unless current_user.garments.visible.outfit_ready?
+      redirect_to week_plan_path, alert: "Add at least one top and one bottom (or a dress) first."
+      return
+    end
+
+    plan = Planner::WeekPlanner.ensure_week!(user: current_user)
+    Planner::WeekPlanner.generate!(user: current_user, week_plan: plan)
+    redirect_to outfits_path, notice: "Outfits generated for your week."
   end
 end

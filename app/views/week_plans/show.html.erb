@@ -1,2 +1,26 @@
-<h1>Week Plan</h1>
-<p>Weekly outfit recommendations</p>
+<% content_for :title, "Week Plan" %>
+<%= turbo_stream_from current_user, :planner %>
+
+<div class="max-w-3xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-semibold mb-2">Week Plan</h1>
+  <p class="text-[var(--muted)] mb-6">Set your events for the week, then generate outfits.</p>
+
+  <div class="flex flex-wrap gap-3 mb-8">
+    <% if current_user.google_refresh_token.present? %>
+      <%= button_to "Sync again", calendar_sync_path, method: :post, class: "btn-ghost px-4 py-2" %>
+    <% else %>
+      <%= button_to "Connect Google Calendar", calendar_sync_path, method: :post, class: "btn-ghost px-4 py-2" %>
+    <% end %>
+    <%= button_to "Use demo week", demo_week_plan_path, method: :post, class: "btn-ghost px-4 py-2" %>
+    <%= button_to "Generate outfits", generate_week_plan_path, method: :post, class: "btn-primary px-4 py-2" %>
+  </div>
+
+  <%= render "week_plans/week_plan", week_plan: @week_plan, event_options: @event_options %>
+</div>
+
+<style>
+  @keyframes weekRowIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
