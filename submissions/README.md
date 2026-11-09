@@ -2,13 +2,11 @@
 
 Personal wardrobe planner SaaS: digitize a closet, plan the week, get rule-based outfit recommendations with AI-written explanations, and optional avatar / “outfit on me” previews.
 
-This folder is the **iteration 1 submission package** for teammates to review before uploading to CourseWorks. Update the team table below, then open a PR or comment on this file as needed.
-
 ## Team
 
 | Name | UNI |
 |------|-----|
-| _[Full name]_ | _[uni1234]_ |
+| Gautam Agarwal| ga2726 |
 | _[Full name]_ | _[uni1234]_ |
 | _[Full name]_ | _[uni1234]_ |
 | _[Full name]_ | _[uni1234]_ |
@@ -33,8 +31,6 @@ This folder is the **iteration 1 submission package** for teammates to review be
 7. **Metrics** — Internal `GET /api/metrics` for studio dashboard (API key).
 
 Stack: Ruby 3.3, Rails 8, Hotwire, PostgreSQL, Solid Queue, Cucumber + RSpec, deployed on Heroku.
-
-Design reference: [docs/ruby_rewrite_design_doc_v2.md](../docs/ruby_rewrite_design_doc_v2.md)
 
 ---
 
