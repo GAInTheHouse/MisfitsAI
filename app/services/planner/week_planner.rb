@@ -62,7 +62,7 @@ module Planner
           )
         end
 
-        ids = suggestions.flat_map { [_1.top, _1.bottom, _1.dress, _1.outerwear, _1.shoes] }.compact.map(&:id)
+        ids = suggestions.flat_map { [ _1.top, _1.bottom, _1.dress, _1.outerwear, _1.shoes ] }.compact.map(&:id)
         ids.tally.each { |id, n| Garment.where(id:).update_all([ "times_recommended = times_recommended + ?", n ]) }
 
         week_plan.update!(generated_at: Time.current)

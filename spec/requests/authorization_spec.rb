@@ -62,7 +62,6 @@ RSpec.describe "Authorization", type: :request do
       patch week_plan_event_path(event), params: { week_event: { event_type: "gym" } }
       expect(response).to have_http_status(:not_found)
     end
-
   end
 
   describe "receipts (Phase 2)" do

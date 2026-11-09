@@ -14,7 +14,7 @@ module Planner
       },
       {
         type: "date_night",
-        keywords: ["date night", "romantic", "anniversary", "valentine"]
+        keywords: [ "date night", "romantic", "anniversary", "valentine" ]
       }
     ].freeze
 

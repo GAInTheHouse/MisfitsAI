@@ -9,25 +9,25 @@ module Planner
       sweatpants cargo_pants dress_pants wide_leg_pants].to_set
 
     FORMALITY_CHAINS = {
-      "work_meeting" => [%w[formal business], %w[smart_casual]],
-      "date_night"   => [%w[smart_casual], %w[casual], %w[formal business]],
-      "gym"          => [%w[casual], %w[smart_casual]],
-      "casual"       => [%w[casual], %w[smart_casual]]
+      "work_meeting" => [ %w[formal business], %w[smart_casual] ],
+      "date_night"   => [ %w[smart_casual], %w[casual], %w[formal business] ],
+      "gym"          => [ %w[casual], %w[smart_casual] ],
+      "casual"       => [ %w[casual], %w[smart_casual] ]
     }.freeze
-    FALLBACK_CHAIN = [%w[casual], %w[smart_casual]].freeze
+    FALLBACK_CHAIN = [ %w[casual], %w[smart_casual] ].freeze
 
     EXCLUDED_SUBCATEGORIES = {
       "work_meeting" => %w[tank_top crop_top graphic_tee halter_neck bodysuit hoodie].to_set,
       "gym"          => %w[blazer vest oxford heels pumps loafers dress_pants].to_set
     }.freeze
 
-    GYM_TAILORING_SUBSTRINGS = ["blazer", "tux", "tailored jacket", "tailored trouser", "dress pant",
-      "dress shirt", "oxford shirt", "pencil skirt", "stiletto", "pump"].freeze
+    GYM_TAILORING_SUBSTRINGS = [ "blazer", "tux", "tailored jacket", "tailored trouser", "dress pant",
+      "dress shirt", "oxford shirt", "pencil skirt", "stiletto", "pump" ].freeze
     GYM_DRESS_SHOE_RE = /\b(heels?|pumps?|stilettos?|oxfords?|loafers?)\b/i
     SUIT_WORD_RE      = /\bsuit\b/i
 
-    SIZE_BANDS = [%w[xxs 00 0], %w[xs 2 4 6], %w[s small 8 10], %w[m medium 12 14], %w[l large 16 18],
-      %w[xl x-large 20 22], %w[xxl 2xl 24 26], %w[xxxl 3xl 28 30]].map(&:to_set).freeze
+    SIZE_BANDS = [ %w[xxs 00 0], %w[xs 2 4 6], %w[s small 8 10], %w[m medium 12 14], %w[l large 16 18],
+      %w[xl x-large 20 22], %w[xxl 2xl 24 26], %w[xxxl 3xl 28 30] ].map(&:to_set).freeze
 
     WARM_COLORS = %w[red orange yellow gold amber coral rust terracotta brown beige tan camel sand cream
       ivory olive mustard peach salmon].to_set
@@ -268,7 +268,7 @@ module Planner
         outer = filtered unless filtered.empty?
       end
 
-      sorted = outer.sort_by { [_1.times_recommended, _1.id] }
+      sorted = outer.sort_by { [ _1.times_recommended, _1.id ] }
       sorted[day_index % sorted.size]
     end
 
@@ -278,11 +278,11 @@ module Planner
 
       if type == "gym"
         casual = shoe_pool.reject { DRESS_SHOE_RE.match?(blob(_1)) }
-        return (casual.first || shoe_pool.min_by { [_1.times_recommended, _1.id] })
+        return (casual.first || shoe_pool.min_by { [ _1.times_recommended, _1.id ] })
       end
 
       picked = pick(shoe_pool, ->(g) { g.category == "shoes" }, chain, used:, event_type: type, label:)
-      picked || shoe_pool.min_by { [_1.times_recommended, _1.id] }
+      picked || shoe_pool.min_by { [ _1.times_recommended, _1.id ] }
     end
   end
 end
