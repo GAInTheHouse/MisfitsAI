@@ -172,6 +172,11 @@ Operational notes: [docs/runbook.md](../docs/runbook.md), [docs/google-cloud-set
 
 ---
 
+
+
+# TEAM NOTES BELOW
+
+
 ## Assignment checklist
 
 | Requirement | Where |
