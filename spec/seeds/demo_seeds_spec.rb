@@ -98,3 +98,14 @@ RSpec.describe "Demo seeds" do
     DEMO_WARDROBE_ITEMS.each { expect(File).to exist(Rails.root.join("db/seeds/images", _1[:image])) }
   end
 end
+
+RSpec.describe "Planner Demo Seeds" do
+  it "generates week plan with 7 events and recommendations" do
+    demo_user = User.find_by(email: 'demo@example.com')
+    week_plan = demo_user.week_plans.last
+    expect(week_plan.events.count).to eq(7)
+    
+    total_recs = week_plan.events.map(&:outfit_recommendation).compact.size
+    expect(total_recs).to eq(7)
+  end
+end
