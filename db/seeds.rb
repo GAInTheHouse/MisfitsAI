@@ -15,8 +15,8 @@ puts "Demo user: #{user.email} (password from DEMO_PASSWORD)"
 garments = DemoWardrobe.seed(user)
 puts "Demo wardrobe: #{garments.size} garments (#{user.garments.count} in total)"
 
-demo_user = User.find_by(email: 'demo@example.com')
-if demo_user&.wardrobe&.outfit_ready?
+demo_user = User.find_by(email: 'demo@misfit.ai')
+if demo_user
   begin
     week_plan = Planner::WeekPlanner.ensure_week!(demo_user)
     Planner::WeekPlanner.apply_demo_week!(week_plan)
