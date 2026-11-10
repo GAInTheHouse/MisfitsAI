@@ -19,8 +19,8 @@ demo_user = User.find_by(email: 'demo@misfit.ai')
 if demo_user
   begin
     week_plan = Planner::WeekPlanner.ensure_week!(user: demo_user)
-    Planner::WeekPlanner.apply_demo_week!(week_plan)
-    Planner::WeekPlanner.generate!(week_plan)
+    Planner::WeekPlanner.apply_demo_week!(user: demo_user, week_plan: week_plan)
+    Planner::WeekPlanner.generate!(user: demo_user, week_plan: week_plan)
     puts "✅ Demo week and 7 outfits successfully generated!"
   rescue => e
     puts "❌ Planner seed failed: #{e.message}"
