@@ -7,9 +7,9 @@ Personal wardrobe planner SaaS: digitize a closet, plan the week, get rule-based
 | Name | UNI |
 |------|-----|
 | Gautam Agarwal| ga2726 |
-| _[Full name]_ | _[uni1234]_ |
-| _[Full name]_ | _[uni1234]_ |
-| _[Full name]_ | _[uni1234]_ |
+| Markos Bontozoglou | mb5644 |
+| Taha Lahlou | tl3386 |
+| Ashton Lollis | adl2199 |
 
 ## Links
 
@@ -207,11 +207,3 @@ GitHub: https://github.com/GAInTheHouse/MisfitsAI
 Tests: 111 Cucumber scenarios and 824 RSpec examples (see repo CI). Run locally with AI_ADAPTER=fake.
 Submission README: submissions/README.md in the repository.
 ```
-
----
-
-## Changelog (submission doc)
-
-| Date | Change |
-|------|--------|
-| 2026-11-09 | Initial iteration 1 submission README; Heroku demo URL added |
