@@ -104,7 +104,7 @@ RSpec.describe "Planner Demo Seeds" do
     demo_user = User.find_by(email: 'demo@misfit.ai')
     week_plan = demo_user.week_plans.last
     expect(week_plan.events.count).to eq(7)
-    
+
     total_recs = week_plan.events.map(&:outfit_recommendation).compact.size
     expect(total_recs).to eq(7)
   end
