@@ -23,6 +23,6 @@ if demo_user
     Planner::WeekPlanner.generate!(week_plan)
     puts "✅ Demo week and 7 outfits successfully generated!"
   rescue => e
-    Rails.logger.error "❌ Planner seed failed: #{e.message}"
+    puts "❌ Planner seed failed: #{e.message}"
   end
 end
