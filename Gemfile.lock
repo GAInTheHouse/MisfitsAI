@@ -141,7 +141,7 @@ GEM
       cucumber (>= 7, < 12)
       railties (>= 6.1, < 9)
     cucumber-tag-expressions (8.1.0)
-    cuprite (0.20)
+    cuprite (0.20.1)
       capybara (~> 3.0)
       ferrum (~> 0.20.1)
     database_cleaner-active_record (2.2.2)
