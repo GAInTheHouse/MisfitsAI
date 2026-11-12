@@ -40,6 +40,10 @@ Rails.application.routes.draw do
     resources :events, only: [ :update ], controller: "week_events"
   end
   resource :calendar_sync, only: [ :create ]
+  # Issue #8: a day's outfits as a timeline, and "I wore this". Declared before resources :outfits so
+  # /outfits/today is not read as an outfit id.
+  get "outfits/today", to: "today_outfits#show", as: :today_outfits
+  patch "outfits/:id/wear", to: "outfit_wears#update", as: :wear_outfit
   resources :outfits, only: [ :index, :show ]
   get "weather" => "weather#show"
 
