@@ -18,7 +18,7 @@
 - [DEVIATION] `features/security/authorization.feature` and `spec/requests/authorization_spec.rb` (Phase 1 harness): added planner cases (another user's outfit, week event, outfits list and week plan), as 8.4 asks of each phase.
 
 ### Decisions made where the doc was silent
-- [DECISION] "Connect Google Calendar" still POSTs to `/calendar_sync`, which answers `307` to `/users/auth/google_oauth2`. OmniAuth's request phase is POST-only, so the old `302` (a GET) could never reach Google. The button has Turbo turned off because the flow leaves the site.
+- [DECISION] "Connect Google Calendar" POSTs straight to `/users/auth/google_oauth2?origin=/week_plan?sync=1` with its own CSRF token, and the callback follows `origin` only when it is the week plan. A first version POSTed to `/calendar_sync` and answered `307` to OmniAuth. That fails in real browsers, because Rails' per-form CSRF tokens are bound to `/calendar_sync`; the test env turns forgery protection off, so a request spec with protection on now covers it. Turbo is off on the button because the flow leaves the site.
 - [DECISION] Back from Google, `/week_plan?sync=1` queues one `SyncCalendarJob` and redirects to `/week_plan`, so a reload does not queue another.
 - [DECISION] Sync feedback is broadcast into `#calendar_sync_status` on the planner stream (success, reconnect, "Couldn't reach Google Calendar. Please try again."). The reconnect prompt also shows on later visits: it is derived from state (Google linked or previously synced, but no refresh token), so no schema change.
 - [DECISION] A second 401 after a successful refresh is treated like `invalid_grant`: both tokens are cleared, so the button goes back to "Connect Google Calendar". Other errors leave the week and the tokens alone.

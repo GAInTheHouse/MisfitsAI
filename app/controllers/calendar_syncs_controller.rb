@@ -10,10 +10,8 @@ class CalendarSyncsController < ApplicationController
     end
 
     if current_user.google_refresh_token.blank?
-      # 6.1: come back to the week plan and sync straight away. OmniAuth's request phase is POST-only
-      # (omniauth-rails_csrf_protection), so a 307 makes the browser re-POST this form, token included.
-      session[:return_to] = week_plan_path(sync: 1)
-      redirect_to user_google_oauth2_omniauth_authorize_path, status: :temporary_redirect
+      # The week plan's Connect button posts to OmniAuth directly (6.1); this only catches a stale page.
+      redirect_to week_plan_path, alert: "Connect Google Calendar first."
       return
     end
 

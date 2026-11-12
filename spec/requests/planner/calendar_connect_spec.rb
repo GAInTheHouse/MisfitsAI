@@ -10,11 +10,10 @@ RSpec.describe "Calendar connect and week plan", type: :request do
   before { sign_in user }
 
   describe "POST /calendar_sync" do
-    it "sends a user without tokens to Google with a 307 and returns to the week plan with sync=1" do
-      post calendar_sync_path
-      expect(response).to have_http_status(:temporary_redirect)
-      expect(response).to redirect_to(user_google_oauth2_omniauth_authorize_path)
-      expect(session[:return_to]).to eq(week_plan_path(sync: 1))
+    it "sends a user without tokens back to the week plan to connect first" do
+      expect { post calendar_sync_path }.not_to have_enqueued_job(Planner::SyncCalendarJob)
+      expect(response).to redirect_to(week_plan_path)
+      expect(flash[:alert]).to eq("Connect Google Calendar first.")
     end
 
     it "queues a sync for a connected user" do
@@ -76,16 +75,46 @@ RSpec.describe "Calendar connect and week plan", type: :request do
       OmniAuth.config.test_mode = test_mode
     end
 
+    def connect_form
+      get week_plan_path
+      Nokogiri::HTML(response.body).css("form").find { _1.at_css("button")&.text == "Connect Google Calendar" }
+    end
+
+    it "posts the Connect button straight to OmniAuth with sync=1 as the origin" do
+      form = connect_form
+      expect(form["action"]).to eq(user_google_oauth2_omniauth_authorize_path(origin: week_plan_path(sync: 1)))
+      expect(form["data-turbo"]).to eq("false")
+    end
+
+    # Regression: per-form CSRF tokens. The test env turns forgery protection off, which hid a 422 here.
+    it "accepts the Connect button's own CSRF token with forgery protection on" do
+      ActionController::Base.allow_forgery_protection = true
+      form = connect_form
+      post form["action"], params: { authenticity_token: form.at_css("input[name=authenticity_token]")["value"] }
+      expect(response).to redirect_to(%r{/users/auth/google_oauth2/callback})
+    ensure
+      ActionController::Base.allow_forgery_protection = false
+    end
+
     it "links the Google account to the signed-in user, keeps their email, and returns to the week plan" do
-      post calendar_sync_path
       expect do
         get user_google_oauth2_omniauth_callback_path,
-            env: { "omniauth.auth" => OmniAuth.config.mock_auth[:google_oauth2] }
+            env: { "omniauth.auth" => OmniAuth.config.mock_auth[:google_oauth2],
+                   "omniauth.origin" => week_plan_path(sync: 1) }
       end.not_to change(User, :count)
 
       expect(response).to redirect_to(week_plan_path(sync: 1))
       expect(user.reload).to have_attributes(uid: "connect-uid", google_refresh_token: "refresh")
       expect(user.email).not_to eq("different.address@gmail.com")
+    end
+
+    it "ignores an origin outside the week plan" do
+      [ "https://evil.example/week_plan", "//evil.example/week_plan", "/profile" ].each do |origin|
+        get user_google_oauth2_omniauth_callback_path,
+            env: { "omniauth.auth" => OmniAuth.config.mock_auth[:google_oauth2], "omniauth.origin" => origin }
+        expect(response.location).not_to include("evil.example")
+        expect(response.location).not_to end_with("/profile")
+      end
     end
 
     it "refuses a Google account that already belongs to another user" do

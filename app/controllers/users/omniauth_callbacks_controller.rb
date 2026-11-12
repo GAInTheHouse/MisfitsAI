@@ -30,9 +30,8 @@ module Users
     end
 
     def failure
-      # A cancelled calendar connect goes back to the week plan (without sync=1); a cancelled sign-in goes home.
-      back = session.delete(:return_to).present? && user_signed_in? ? week_plan_path : root_path
-      redirect_to back, alert: "Google sign-in was cancelled"
+      # Signed-in users only reach Google through the calendar connect, so send them back to the week plan.
+      redirect_to user_signed_in? ? week_plan_path : root_path, alert: "Google sign-in was cancelled"
     end
 
     private
@@ -68,7 +67,17 @@ module Users
     end
 
     def after_sign_in_path_for(resource)
-      session.delete(:return_to) || super
+      session.delete(:return_to) || calendar_connect_origin || super
+    end
+
+    # OmniAuth keeps the request's origin param (the week plan's Connect button sends /week_plan?sync=1).
+    # Only week plan paths are followed, so the param cannot become an open redirect.
+    def calendar_connect_origin
+      origin = request.env["omniauth.origin"].to_s
+      path = URI.parse(origin).then { |uri| uri.host.nil? && uri.scheme.nil? ? uri.path : nil }
+      origin if path == week_plan_path
+    rescue URI::InvalidURIError
+      nil
     end
   end
 end
