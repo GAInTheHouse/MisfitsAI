@@ -10,3 +10,25 @@
 ## Exit Gate Verification
 - All RSpec examples pass (763 examples, 0 failures).
 - All Cucumber scenarios pass (75 scenarios, 0 failures).
+
+## Follow-up: calendar sync UX and planner tests (issue #31)
+
+### Deviations from the design doc
+- [DEVIATION] `Users::OmniauthCallbacksController` (Phase 1): a signed-in user's Google callback now links the Google account to `current_user` (6.1, calendar connect), whatever its email. It previously saved a new user before rejecting the mismatch. A Google account already linked to someone else still gets "Account mismatch". A cancelled calendar connect now returns to `/week_plan` instead of `/`.
+- [DEVIATION] `features/security/authorization.feature` and `spec/requests/authorization_spec.rb` (Phase 1 harness): added planner cases (another user's outfit, week event, outfits list and week plan), as 8.4 asks of each phase.
+
+### Decisions made where the doc was silent
+- [DECISION] "Connect Google Calendar" still POSTs to `/calendar_sync`, which answers `307` to `/users/auth/google_oauth2`. OmniAuth's request phase is POST-only, so the old `302` (a GET) could never reach Google. The button has Turbo turned off because the flow leaves the site.
+- [DECISION] Back from Google, `/week_plan?sync=1` queues one `SyncCalendarJob` and redirects to `/week_plan`, so a reload does not queue another.
+- [DECISION] Sync feedback is broadcast into `#calendar_sync_status` on the planner stream (success, reconnect, "Couldn't reach Google Calendar. Please try again."). The reconnect prompt also shows on later visits: it is derived from state (Google linked or previously synced, but no refresh token), so no schema change.
+- [DECISION] A second 401 after a successful refresh is treated like `invalid_grant`: both tokens are cleared, so the button goes back to "Connect Google Calendar". Other errors leave the week and the tokens alone.
+- [DECISION] The generate guard renders the week plan with `422` and `flash.now`, which keeps the HTML-safe "Go to your wardrobe" link. A redirect's flash goes through the session and would lose it.
+
+### Fixes found while testing
+- `WeekEventsController#update` called `dom_id`, which controllers do not have. Every pill click returned a 500 after saving. It now uses `helpers.dom_id`.
+- `CalendarSync` crashed when a day mixed all-day and timed events (it sorted strings against times), and a second 401 escaped the `rescue` and failed the job.
+- The `I sync my calendar` step passed a Regexp to `click_button`, which Capybara does not match.
+
+### Not done here
+- `outfits.feature` scenarios that need the full Outfits page (hide toggle, regenerate, the missing-bottom banner) belong to issues #29 and #30.
+- A broadcast can still be missed if the job finishes before the page subscribes to the stream; reloading shows the synced week.

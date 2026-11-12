@@ -176,4 +176,38 @@ RSpec.describe Planner::RecommendationEngine, type: :service do
       expect(day.top).to eq(untagged)
     end
   end
+
+  describe "formality chain order (6.8.1)" do
+    it "falls back to smart_casual for work when nothing is formal or business" do
+      tee = create(:garment, :top, user:, formality: "casual", name: "Tee")
+      polo = create(:garment, :top, user:, formality: "smart_casual", name: "Polo")
+      pants = create(:garment, :bottom, user:, formality: "smart_casual")
+      expect(call_engine([ tee, polo, pants ], %w[work_meeting]).first.top).to eq(polo)
+    end
+
+    it "prefers smart_casual separates over casual and business on a date night without a dress" do
+      tee = create(:garment, :top, user:, formality: "casual", name: "Tee")
+      shirt = create(:garment, :top, user:, formality: "business", name: "Business Shirt")
+      knit = create(:garment, :top, user:, formality: "smart_casual", name: "Fine Knit")
+      pants = create(:garment, :bottom, user:, formality: "smart_casual")
+      expect(call_engine([ tee, shirt, knit, pants ], %w[date_night]).first.top).to eq(knit)
+    end
+
+    it "prefers casual over smart_casual on a casual day" do
+      polo = create(:garment, :top, user:, formality: "smart_casual", name: "Polo")
+      tee = create(:garment, :top, user:, formality: "casual", name: "Tee")
+      jeans = create(:garment, :bottom, user:, formality: "casual")
+      expect(call_engine([ polo, tee, jeans ], %w[casual]).first.top).to eq(tee)
+    end
+  end
+
+  describe "tone bonus" do
+    it "prefers a colour in the user's tone when everything else ties" do
+      user.profile.update!(color_tone: "warm", favorite_colors: [], avoided_colors: [])
+      gray = create(:garment, :top, user:, formality: "casual", color_primary: "gray", name: "Gray Tee")
+      rust = create(:garment, :top, user:, formality: "casual", color_primary: "rust", name: "Rust Tee")
+      jeans = create(:garment, :bottom, user:, formality: "casual")
+      expect(call_engine([ gray, rust, jeans ], %w[casual]).first.top).to eq(rust)
+    end
+  end
 end

@@ -5,11 +5,19 @@
   <h1 class="text-2xl font-semibold mb-2">Week Plan</h1>
   <p class="text-[var(--muted)] mb-6">Set your events for the week, then generate outfits.</p>
 
+  <div id="calendar_sync_status">
+    <% if @google_reconnect_needed %>
+      <%= render "week_plans/sync_status", message: Planner::CalendarSync::RECONNECT_MESSAGE, tone: :alert %>
+    <% end %>
+  </div>
+
   <div class="flex flex-wrap gap-3 mb-8">
     <% if current_user.google_refresh_token.present? %>
       <%= button_to "Sync again", calendar_sync_path, method: :post, class: "btn-ghost px-4 py-2" %>
     <% else %>
-      <%= button_to "Connect Google Calendar", calendar_sync_path, method: :post, class: "btn-ghost px-4 py-2" %>
+      <%# No Turbo: the 307 re-POSTs to OmniAuth, which redirects off-site to Google's consent screen. %>
+      <%= button_to "Connect Google Calendar", calendar_sync_path, method: :post, class: "btn-ghost px-4 py-2",
+                    form: { data: { turbo: false } } %>
     <% end %>
     <%= button_to "Use demo week", demo_week_plan_path, method: :post, class: "btn-ghost px-4 py-2" %>
     <%= button_to "Generate outfits", generate_week_plan_path, method: :post, class: "btn-primary px-4 py-2" %>

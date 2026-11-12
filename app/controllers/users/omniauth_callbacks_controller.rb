@@ -11,22 +11,16 @@ module Users
         return
       end
 
-      user = User.from_omniauth(auth)
-      existing = User.where("lower(email) = ?", auth.info.email.downcase).where(provider: nil).first
-      if user.new_record? && existing
-        user = existing
-        user.provider = auth.provider
-        user.uid = auth.uid
+      user = user_signed_in? ? link_current_user(auth) : find_or_build_user(auth)
+      unless user
+        session.delete(:return_to)
+        redirect_to root_path, alert: "Account mismatch"
+        return
       end
 
       user.name ||= auth.info.name
       user.save!
       store_google_tokens!(user, auth)
-
-      if user_signed_in? && current_user.id != user.id
-        redirect_to root_path, alert: "Account mismatch"
-        return
-      end
 
       sign_in_and_redirect user, event: :authentication
     rescue StandardError => e
@@ -36,10 +30,34 @@ module Users
     end
 
     def failure
-      redirect_to root_path, alert: "Google sign-in was cancelled"
+      # A cancelled calendar connect goes back to the week plan (without sync=1); a cancelled sign-in goes home.
+      back = session.delete(:return_to).present? && user_signed_in? ? week_plan_path : root_path
+      redirect_to back, alert: "Google sign-in was cancelled"
     end
 
     private
+
+    def find_or_build_user(auth)
+      user = User.from_omniauth(auth)
+      existing = User.where("lower(email) = ?", auth.info.email.downcase).where(provider: nil).first
+      if user.new_record? && existing
+        user = existing
+        user.provider = auth.provider
+        user.uid = auth.uid
+      end
+      user
+    end
+
+    # 6.1 calendar connect: a signed-in user links the Google account to themselves, whatever its email.
+    # Returns nil when that Google account already belongs to someone else.
+    def link_current_user(auth)
+      owner = User.find_by(provider: auth.provider, uid: auth.uid)
+      return nil if owner && owner.id != current_user.id
+
+      current_user.provider = auth.provider
+      current_user.uid = auth.uid
+      current_user
+    end
 
     def store_google_tokens!(user, auth)
       creds = auth.credentials

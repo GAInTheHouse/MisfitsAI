@@ -11,7 +11,7 @@ class WeekEventsController < ApplicationController
       respond_to do |format|
         format.turbo_stream do
           render turbo_stream: turbo_stream.replace(
-            dom_id(@event),
+            helpers.dom_id(@event),
             partial: "week_plans/day_row",
             locals: { event: @event, event_options: @event_options }
           )
