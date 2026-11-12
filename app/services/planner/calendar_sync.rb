@@ -90,26 +90,40 @@ module Planner
 
     def apply_events!(items)
       week = @week_start..(@week_start + 6)
-      winners = {}
       # Start-time order, Google's order breaking ties, so the first event wins a same-priority tie (6.7 step 6).
-      timed = items.each_with_index.filter_map do |item, index|
+      by_date = items.each_with_index.filter_map do |item, index|
         date, starts_at = event_date_and_start(item)
         [ date, starts_at, index, item ] if date && week.cover?(date)
-      end
-      timed.sort_by { |_date, starts_at, index, _item| [ starts_at, index ] }.each do |date, _starts_at, _index, item|
-        type = EventClassifier.call(item.summary)
-        current = winners[date]
-        next if current && EventClassifier.priority(type) <= EventClassifier.priority(current[:type])
-
-        winners[date] = { type:, summary: item.summary.to_s }
-      end
+      end.sort_by { |_date, starts_at, index, _item| [ starts_at, index ] }.group_by(&:first)
 
       week.each do |date|
+        day_items = (by_date[date] || []).map(&:last)
+        classified = day_items.map { [ _1, EventClassifier.call(_1.summary) ] }
+        winner = classified.reduce(nil) do |best, pair|
+          best.nil? || EventClassifier.priority(pair.last) > EventClassifier.priority(best.last) ? pair : best
+        end
+
         event = @plan.week_events.find_or_initialize_by(date:)
-        event.event_type = winners.dig(date, :type) || "none"
-        event.original_summary = winners.dig(date, :summary)
+        event.event_type = winner&.last || "none"
+        event.original_summary = winner&.first&.summary&.to_s
         event.save!
+        replace_calendar_events!(event, classified)
       end
+    end
+
+    # Issue #8: keep every event of the day so the planner can split it into time blocks.
+    def replace_calendar_events!(week_event, classified)
+      week_event.calendar_events.delete_all
+      rows = classified.each_with_index.map do |(item, type), position|
+        all_day = item.start&.date.present?
+        {
+          week_event_id: week_event.id, summary: item.summary.to_s, event_type: type, position:, all_day:,
+          location: item.location.presence,
+          starts_at: all_day ? nil : item.start.date_time.in_time_zone(@user.time_zone),
+          ends_at: all_day ? nil : item.end&.date_time&.in_time_zone(@user.time_zone)
+        }
+      end
+      CalendarEvent.insert_all!(rows) if rows.any?
     end
 
     # 6.7 step 4: all-day events use start.date; timed events use the start time in the user's zone.

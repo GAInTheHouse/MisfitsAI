@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_180002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -74,6 +74,21 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id"], name: "index_body_measurements_on_user_id", unique: true
+  end
+
+  create_table "calendar_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "week_event_id", null: false
+    t.string "summary"
+    t.string "event_type", default: "casual", null: false
+    t.datetime "starts_at"
+    t.datetime "ends_at"
+    t.boolean "all_day", default: false, null: false
+    t.string "location"
+    t.integer "position", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["week_event_id", "position"], name: "index_calendar_events_on_week_event_id_and_position"
+    t.index ["week_event_id"], name: "index_calendar_events_on_week_event_id"
   end
 
   create_table "garment_drafts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -146,12 +161,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
     t.string "preview_cache_key"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "segment_index", default: 0, null: false
+    t.datetime "starts_at"
+    t.datetime "ends_at"
+    t.string "segment_label"
+    t.text "change_reason"
+    t.datetime "worn_at"
     t.index ["bottom_id"], name: "index_outfit_recommendations_on_bottom_id"
     t.index ["dress_id"], name: "index_outfit_recommendations_on_dress_id"
     t.index ["outerwear_id"], name: "index_outfit_recommendations_on_outerwear_id"
     t.index ["shoes_id"], name: "index_outfit_recommendations_on_shoes_id"
     t.index ["top_id"], name: "index_outfit_recommendations_on_top_id"
-    t.index ["week_plan_id", "date"], name: "index_outfit_recommendations_on_week_plan_id_and_date", unique: true
+    t.index ["week_plan_id", "date", "segment_index"], name: "index_outfit_recommendations_on_plan_date_segment", unique: true
     t.index ["week_plan_id"], name: "index_outfit_recommendations_on_week_plan_id"
   end
 
@@ -409,6 +430,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "ai_calls", "users"
   add_foreign_key "body_measurements", "users"
+  add_foreign_key "calendar_events", "week_events", on_delete: :cascade
   add_foreign_key "garment_drafts", "intake_batches"
   add_foreign_key "garment_drafts", "users"
   add_foreign_key "garments", "users"

@@ -98,6 +98,30 @@ RSpec.describe Planner::CalendarSync, type: :service do
       expect(day(2)).to have_attributes(event_type: "work_meeting", original_summary: "Team offsite review")
     end
 
+    it "stores every event of the day with its type, times and location (issue #8)" do
+      run = timed("Morning run", "2026-10-19T07:00:00-04:00")
+      run.end = Google::Apis::CalendarV3::EventDateTime.new(date_time: DateTime.parse("2026-10-19T08:00:00-04:00"))
+      run.location = "Central Park"
+      calendar_returns(run, timed("Sprint planning", "2026-10-19T09:00:00-04:00"), all_day("Offsite", "2026-10-19"))
+
+      described_class.new(user:).sync!
+
+      stored = day(0).calendar_events.to_a
+      expect(stored.map { [ _1.summary, _1.event_type, _1.all_day ] })
+        .to eq([ [ "Offsite", "casual", true ], [ "Morning run", "gym", false ], [ "Sprint planning", "work_meeting", false ] ])
+      expect(stored.second).to have_attributes(location: "Central Park",
+                                               starts_at: Time.zone.parse("2026-10-19 11:00 UTC"),
+                                               ends_at: Time.zone.parse("2026-10-19 12:00 UTC"))
+    end
+
+    it "replaces a day's stored events on the next sync" do
+      calendar_returns(timed("Sprint planning", "2026-10-19T09:00:00-04:00"))
+      described_class.new(user:).sync!
+      calendar_returns
+      described_class.new(user:).sync!
+      expect(CalendarEvent.where(week_event: plan.week_events)).to be_empty
+    end
+
     it "ignores events outside the week" do
       calendar_returns(timed("Interview", "2026-10-26T09:00:00-04:00"))
       described_class.new(user:).sync!

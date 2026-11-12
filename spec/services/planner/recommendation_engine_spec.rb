@@ -210,4 +210,26 @@ RSpec.describe Planner::RecommendationEngine, type: :service do
       expect(call_engine([ gray, rust, jeans ], %w[casual]).first.top).to eq(rust)
     end
   end
+
+  describe "segments (issue #8)" do
+    it "uses a segment's chain in place of its event type's" do
+      business = create(:garment, :top, user:, formality: "business", name: "Oxford")
+      smart = create(:garment, :top, user:, formality: "smart_casual", name: "Fine Knit")
+      pants = create(:garment, :bottom, user:, formality: "smart_casual")
+      segment = Planner::Segment.new(date: start, index: 0, event_type: "work_meeting",
+                                     chain: Planner::DaySegmenter::SHARED_WORK_DINNER_CHAIN, starts_at: nil,
+                                     ends_at: nil, label: nil, change_reason: nil, summaries: [])
+      day = described_class.call(garments: [ business, smart, pants ], events: [ segment ], context:).first
+      expect(day.top).to eq(smart)
+    end
+
+    it "ranks recently worn pieces after unworn ones" do
+      worn = create(:garment, :top, user:, formality: "casual", times_recommended: 0, name: "Worn Tee")
+      fresh = create(:garment, :top, user:, formality: "casual", times_recommended: 3, name: "Fresh Tee")
+      jeans = create(:garment, :bottom, user:, formality: "casual")
+      day = described_class.call(garments: [ worn, fresh, jeans ], events: events_for(%w[casual]), context:,
+                                 recently_worn_ids: Set[worn.id]).first
+      expect(day.top).to eq(fresh)
+    end
+  end
 end

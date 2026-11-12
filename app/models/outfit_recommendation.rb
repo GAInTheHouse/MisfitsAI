@@ -15,6 +15,13 @@ class OutfitRecommendation < ApplicationRecord
 
   validates :explanation_status, inclusion: { in: EXPLANATION_STATUSES }, allow_nil: true
   validates :preview_status, inclusion: { in: PREVIEW_STATUSES }, allow_nil: true
+  validates :segment_index, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+
+  scope :in_day_order, -> { order(:date, :segment_index) }
+
+  def worn?
+    worn_at.present?
+  end
 
   def garments_in_display_order
     [ outerwear, top, dress, bottom, shoes ].compact

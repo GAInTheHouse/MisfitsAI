@@ -130,3 +130,24 @@ end
 Then("my week plan source should be {string}") do |source|
   expect(Planner::WeekPlanner.ensure_week!(user: @user).source).to eq(source)
 end
+
+# Issue #8: the /outfits/today timeline.
+When("I open today's outfits") do
+  visit today_outfits_path
+end
+
+Then(/^I should see (\d+) outfits? on the timeline$/) do |count|
+  expect(page).to have_css(".timeline-segment", count: count.to_i)
+end
+
+Then("outfit {int} on the timeline should include {string}") do |position, name|
+  expect(all(".timeline-segment")[position - 1]).to have_content(name)
+end
+
+Then("outfit {int} on the timeline should say {string}") do |position, text|
+  expect(all(".timeline-segment")[position - 1]).to have_content(text)
+end
+
+When("I mark outfit {int} on the timeline as worn") do |position|
+  within(all(".timeline-segment")[position - 1]) { click_button "I wore this" }
+end
