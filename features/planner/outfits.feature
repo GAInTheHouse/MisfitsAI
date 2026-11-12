@@ -49,3 +49,14 @@ Feature: Weekly outfit recommendations
     When I generate outfits for my week
     And background jobs finish
     Then Monday's card should show "we've put together the best available pieces from your wardrobe"
+
+  Scenario: The On Me slot stays empty while its flag is off
+    Given the "outfit_preview" feature is disabled
+    When I generate outfits for my week
+    Then I should see 7 day cards
+    And I should not see "Generate look"
+
+  Scenario: The On Me slot appears when its flag is on
+    Given the "outfit_preview" feature is enabled
+    When I generate outfits for my week
+    Then I should see "Generate look"

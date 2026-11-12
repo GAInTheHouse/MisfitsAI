@@ -5,14 +5,26 @@
   <h1 class="text-2xl font-semibold mb-2">Week Plan</h1>
   <p class="text-[var(--muted)] mb-6">Set your events for the week, then generate outfits.</p>
 
+  <div id="calendar_sync_status">
+    <% if @google_reconnect_needed %>
+      <%= render "week_plans/sync_status", message: Planner::CalendarSync::RECONNECT_MESSAGE, tone: :alert %>
+    <% end %>
+  </div>
+
   <div class="flex flex-wrap gap-3 mb-8">
     <% if current_user.google_refresh_token.present? %>
       <%= button_to "Sync again", calendar_sync_path, method: :post, class: "btn-ghost px-4 py-2" %>
     <% else %>
-      <%= button_to "Connect Google Calendar", calendar_sync_path, method: :post, class: "btn-ghost px-4 py-2" %>
+      <%# 6.1: POST straight to OmniAuth with this form's own CSRF token (per-form tokens rule out redirecting
+          another form's POST there). origin brings the user back to sync. No Turbo: Google's page is off-site. %>
+      <%= button_to "Connect Google Calendar", user_google_oauth2_omniauth_authorize_path(origin: week_plan_path(sync: 1)),
+                    method: :post, class: "btn-ghost px-4 py-2", form: { data: { turbo: false } } %>
     <% end %>
     <%= button_to "Use demo week", demo_week_plan_path, method: :post, class: "btn-ghost px-4 py-2" %>
     <%= button_to "Generate outfits", generate_week_plan_path, method: :post, class: "btn-primary px-4 py-2" %>
+    <% if @week_plan.outfit_recommendations.exists? %>
+      <%= link_to "Today's outfits", today_outfits_path, class: "btn-ghost px-4 py-2" %>
+    <% end %>
   </div>
 
   <%= render "week_plans/week_plan", week_plan: @week_plan, event_options: @event_options %>

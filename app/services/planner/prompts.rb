@@ -46,7 +46,11 @@ module Planner
     def explanation_prompt(rec)
       day_name = rec.date.strftime("%A")
       event = event_label(rec.event_type)
-      "Day: #{day_name} | Event: #{event}. Write the one-sentence explanation for this outfit."
+      parts = [ "Day: #{day_name}" ]
+      parts << "Time: #{rec.segment_label}" if rec.segment_label.present? # issue #8: one of several outfits
+      parts << "Event: #{event}"
+      prompt = "#{parts.join(' | ')}. Write the one-sentence explanation for this outfit."
+      rec.change_reason.present? ? "#{prompt} It is an outfit change: #{rec.change_reason}" : prompt
     end
   end
 end

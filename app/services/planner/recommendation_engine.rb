@@ -41,14 +41,18 @@ module Planner
     DRESS_SHOE_RE     = /\b(heel|pump|stiletto|oxford|loafer|wingtip|brogue)s?\b/i
     OUTERWEAR_EVENTS  = %w[work_meeting casual].to_set
 
-    def self.call(garments:, events:, context:)
-      new(garments:, events:, context:).call
+    # events: anything with #date and #event_type, in order: WeekEvents (one outfit per day) or
+    # Planner::Segments (issue #8, one outfit per time block; a segment's #chain overrides the formality chain).
+    # recently_worn_ids: garment ids the user confirmed wearing lately; they lose ties to unworn pieces.
+    def self.call(garments:, events:, context:, recently_worn_ids: Set.new)
+      new(garments:, events:, context:, recently_worn_ids:).call
     end
 
-    def initialize(garments:, events:, context:)
+    def initialize(garments:, events:, context:, recently_worn_ids: Set.new)
       @garments = garments
       @events = events
       @context = context
+      @recently_worn = recently_worn_ids.to_set
       @avoid_words = color_word_set(@context.avoided_colors)
       @fav_words = color_word_set(@context.favorite_colors)
       @tone = @context.color_tone&.to_s&.downcase
@@ -62,7 +66,7 @@ module Planner
       @events.each_with_index.map do |event, day_index|
         displayed = event.event_type
         type      = displayed == "none" ? "casual" : displayed
-        chain     = FORMALITY_CHAINS.fetch(type, FALLBACK_CHAIN)
+        chain     = (event.chain if event.respond_to?(:chain)) || FORMALITY_CHAINS.fetch(type, FALLBACK_CHAIN)
         gym       = type == "gym" ? method(:gym_allowed?) : nil
         tiebreak  = type == "work_meeting" ? ->(g) { structured_jacket?(g) ? 1 : 0 } : nil
 
@@ -211,7 +215,7 @@ module Planner
       scores = candidates.index_with { color_score(_1) }
       candidates.sort_by! do |g|
         tb = tiebreak ? tiebreak.call(g) : 0
-        [ g.times_recommended, tb, -scores[g], g.id ]
+        [ @recently_worn.include?(g.id) ? 1 : 0, g.times_recommended, tb, -scores[g], g.id ]
       end
 
       tiers = chain.map(&:to_set) + [ :untagged ]
