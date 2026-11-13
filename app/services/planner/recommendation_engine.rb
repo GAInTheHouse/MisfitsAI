@@ -207,9 +207,11 @@ module Planner
     end
 
     def pick(pool, type_fn, chain, used:, event_type:, label:, extra: nil, tiebreak: nil, allow_reuse: true)
-      candidates = pool.select do |g|
+      matching = pool.select do |g|
         type_fn.call(g) && !excluded_for_event?(g, event_type) && (extra.nil? || extra.call(g))
       end
+      clean_matching = matching.select(&:clean?)
+      candidates = clean_matching.any? ? clean_matching : matching
       return nil if candidates.empty?
 
       scores = candidates.index_with { color_score(_1) }
@@ -266,6 +268,8 @@ module Planner
 
       outer = pool.select { _1.category == "outerwear" }
       return nil if outer.empty?
+      clean_outer = outer.select(&:clean?)
+      outer = clean_outer if clean_outer.any?
 
       if top && (structured_jacket?(top) || STRUCTURED_TOP_RE.match?(blob(top)))
         filtered = outer.reject { structured_jacket?(_1) || blob(_1).include?("blazer") }

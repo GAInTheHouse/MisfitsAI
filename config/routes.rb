@@ -18,9 +18,12 @@ Rails.application.routes.draw do
   patch "time_zone" => "time_zones#update"
 
   resource :wardrobe, only: [ :show ], controller: "garments"
+  post "wardrobe/wash_all", to: "garment_laundries#wash_all", as: :wash_all_wardrobe
+  resource :wear_history, only: [ :show ]
   resources :garments, only: [ :new, :create, :edit, :update, :destroy ] do
     patch :hide, on: :member
     post :retry_image, on: :member
+    patch :laundry, on: :member, controller: "garment_laundries", action: :update
   end
   namespace :wardrobe do
     resources :searches, only: [ :new, :create ] do
