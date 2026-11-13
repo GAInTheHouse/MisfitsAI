@@ -7,7 +7,7 @@ RSpec.describe Planner::RecommendationEngine, "laundry filtering" do
     Struct.new(:gender, :measurements, :avoided_colors, :favorite_colors, :color_tone, keyword_init: true)
           .new(avoided_colors: [], favorite_colors: [])
   end
-  let(:event) { Struct.new(:date, :event_type, keyword_init: true).new(date: Date.current, event_type: "casual") }
+  let(:event) { Data.define(:date, :event_type).new(date: Date.current, event_type: "casual") }
 
   it "prefers clean garments over garments currently in laundry" do
     dirty_top = Garment.new(id: "1", name: "Dirty Tee", category: "top", formality: "casual", laundry_status: "in_laundry", times_recommended: 0)
