@@ -8,6 +8,7 @@ class WeekPlansController < ApplicationController
     @events = @week_plan.week_events.order(:date)
     @recommendations = @week_plan.outfit_recommendations.order(:date).index_by(&:date)
     @event_options = ::Options.fetch(:event_types).map { |e| [ e[:key], e[:label] ] }
+    @forecast = Planner::Weather.forecast_for(location: default_weather_location)
   end
 
   def demo
@@ -25,5 +26,14 @@ class WeekPlansController < ApplicationController
     plan = Planner::WeekPlanner.ensure_week!(user: current_user)
     Planner::WeekPlanner.generate!(user: current_user, week_plan: plan)
     redirect_to outfits_path, notice: "Outfits generated for your week."
+  end
+
+  private
+
+  def default_weather_location
+    tz = current_user.time_zone.to_s
+    iana = ActiveSupport::TimeZone::MAPPING[tz] || tz
+    city = iana.split("/").last&.tr("_", " ") if iana.include?("/")
+    city.presence || "New York"
   end
 end

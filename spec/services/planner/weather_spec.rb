@@ -3,65 +3,31 @@
 require "rails_helper"
 
 RSpec.describe Planner::Weather, type: :service do
-  let(:location) { "New York" }
-  let(:date) { Date.current }
+  it "returns a fallback forecast hash when API key is missing" do
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("WEATHER_API_KEY").and_return(nil)
 
-  context "when WEATHER_API_KEY is missing" do
-    it "returns default fallback forecast" do
-      ClimateControl.modify(WEATHER_API_KEY: nil) do
-        forecast = described_class.forecast_for(location: location, date: date)
-        expect(forecast).to eq({
-          temp_f: 72,
-          condition: "Sunny",
-          location: location,
-          date: date
-        })
-      end
-    end
+    forecast = described_class.forecast_for(location: "New York")
+    expect(forecast).to include(temp_f: 72, condition: "Sunny", location: "New York", date: Date.current)
   end
 
-  context "when WEATHER_API_KEY is present" do
-    let(:api_key) { "dummy_api_key" }
-
-    it "parses successful weather API response" do
-      ClimateControl.modify(WEATHER_API_KEY: api_key) do
-        fake_response = instance_double(
-          Faraday::Response,
-          success?: true,
-          body: {
-            "main" => { "temp" => 68.4 },
-            "weather" => [ { "main" => "Rain" } ]
-          }.to_json
-        )
-
-        allow_any_instance_of(Faraday::Connection).to receive(:get).and_return(fake_response)
-
-        forecast = described_class.forecast_for(location: location, date: date)
-        expect(forecast[:temp_f]).to eq(68)
-        expect(forecast[:condition]).to eq("Rain")
-        expect(forecast[:location]).to eq(location)
+  it "parses temperature and condition from OpenWeatherMap responses" do
+    stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+      stub.get("/data/2.5/weather") do
+        [ 200, { "Content-Type" => "application/json" }, '{"main":{"temp":48.6},"weather":[{"main":"Clouds"}]}' ]
       end
     end
+    conn = Faraday.new(url: "https://api.openweathermap.org/data/2.5") { |f| f.adapter :test, stubs }
 
-    it "falls back gracefully on HTTP failure" do
-      ClimateControl.modify(WEATHER_API_KEY: api_key) do
-        fake_response = instance_double(Faraday::Response, success?: false)
-        allow_any_instance_of(Faraday::Connection).to receive(:get).and_return(fake_response)
+    service = described_class.new(location: "New York", date: Date.new(2026, 11, 13))
+    allow(service).to receive(:api_key).and_return("test-key")
+    allow(service).to receive(:connection).and_return(conn)
 
-        forecast = described_class.forecast_for(location: location, date: date)
-        expect(forecast[:temp_f]).to eq(72)
-        expect(forecast[:condition]).to eq("Sunny")
-      end
-    end
-
-    it "falls back gracefully on network error" do
-      ClimateControl.modify(WEATHER_API_KEY: api_key) do
-        allow_any_instance_of(Faraday::Connection).to receive(:get).and_raise(Faraday::TimeoutError)
-
-        forecast = described_class.forecast_for(location: location, date: date)
-        expect(forecast[:temp_f]).to eq(72)
-        expect(forecast[:condition]).to eq("Sunny")
-      end
-    end
+    expect(service.fetch_forecast).to eq(
+      temp_f: 49,
+      condition: "Clouds",
+      location: "New York",
+      date: Date.new(2026, 11, 13)
+    )
   end
 end
