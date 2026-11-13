@@ -284,6 +284,10 @@ module Planner
       shoe_pool = pool.select { _1.category == "shoes" }
       return nil if shoe_pool.empty?
 
+      # Issue #8 / #9: like pick, prefer clean shoes; the gym branch and the fallbacks below skip pick.
+      clean_shoes = shoe_pool.select(&:clean?)
+      shoe_pool = clean_shoes if clean_shoes.any?
+
       if type == "gym"
         casual = shoe_pool.reject { DRESS_SHOE_RE.match?(blob(_1)) }
         return (casual.first || shoe_pool.min_by { [ _1.times_recommended, _1.id ] })
