@@ -48,8 +48,16 @@ class WeekPlansController < ApplicationController
     @events = @week_plan.week_events.order(:date)
     @recommendations = @week_plan.outfit_recommendations.order(:date).index_by(&:date)
     @event_options = ::Options.fetch(:event_types).map { |e| [ e[:key], e[:label] ] }
+    @forecast = Planner::Weather.forecast_for(location: default_weather_location)
     # Planner::CalendarSync clears the tokens when Google rejects them; keep asking until the user reconnects.
     @google_reconnect_needed = current_user.google_refresh_token.blank? &&
                                (current_user.google_calendar_connected_at.present? || current_user.uid.present?)
+  end
+
+  def default_weather_location
+    tz = current_user.time_zone.to_s
+    iana = ActiveSupport::TimeZone::MAPPING[tz] || tz
+    city = iana.split("/").last&.tr("_", " ") if iana.include?("/")
+    city.presence || "New York"
   end
 end
