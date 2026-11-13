@@ -62,3 +62,15 @@ Feature: Full-day outfit planning
   Scenario: Days without a plan point back to the calendar
     When I open today's outfits
     Then I should see "Plan your week first."
+
+  Scenario: Pieces in the laundry are left out when something clean fits
+    Given my wardrobe also contains a clean "Gray Hoodie" top
+    And "Gym Tee" is in the laundry
+    And my Google calendar has these events:
+      | date       | summary     | time  |
+      | 2026-10-19 | Morning run | 07:00 |
+    When I sync my calendar
+    And I generate outfits for my week
+    And I open today's outfits
+    Then outfit 1 on the timeline should include "Gray Hoodie"
+    And outfit 1 on the timeline should not include "Gym Tee"

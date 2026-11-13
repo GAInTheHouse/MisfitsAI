@@ -87,4 +87,23 @@ RSpec.describe Planner::WeekPlanner, type: :service do
       expect(plan.outfit_recommendations.find_by!(date: tuesday.date).top).to eq(other_tee)
     end
   end
+
+  describe "laundry and wear history (issues #8, #9)" do
+    it "only counts clean smart-casual pieces for a shared work-and-dinner outfit" do
+      top = create(:garment, :top, user:, formality: "smart_casual")
+      bottom = create(:garment, :bottom, user:, formality: "smart_casual")
+      expect(described_class.smart_casual_ready?([ top, bottom ])).to be(true)
+
+      top.update!(laundry_status: "in_laundry")
+      expect(described_class.smart_casual_ready?([ top, bottom ])).to be(false)
+    end
+
+    it "treats manually recorded wears as recent" do
+      worn = create(:garment, :top, user:)
+      old = create(:garment, :bottom, user:)
+      worn.record_wear!(worn_on: Date.current, source: "manual")
+      old.record_wear!(worn_on: 10.days.ago.to_date, source: "manual")
+      expect(described_class.recently_worn_ids(user)).to contain_exactly(worn.id)
+    end
+  end
 end

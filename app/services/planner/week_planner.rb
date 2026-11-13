@@ -89,17 +89,22 @@ module Planner
       end
     end
 
-    # A work meeting and a date night can share one outfit only if the wardrobe has smart-casual pieces for it.
+    # A work meeting and a date night can share one outfit only if the wardrobe has clean smart-casual pieces
+    # for it. Pieces in the laundry (#9) don't count, so the planner suggests a change instead.
     def self.smart_casual_ready?(garments)
-      smart = garments.reject(&:hidden_from_recommendations).select { _1.formality == "smart_casual" }
+      smart = garments.reject(&:hidden_from_recommendations).select { _1.clean? && _1.formality == "smart_casual" }
       smart.any? { _1.category == "dress" } ||
         (smart.any? { _1.category == "top" } && smart.any? { _1.category == "bottom" })
     end
 
+    # Pieces worn in the last week: #9's wear history (outfit confirmations and manual "worn" marks), plus
+    # confirmed outfits from before that history existed.
     def self.recently_worn_ids(user)
-      OutfitRecommendation.joins(:week_plan).where(week_plans: { user_id: user.id })
-                          .where(worn_at: RECENTLY_WORN_WINDOW.ago..)
-                          .pluck(*SLOTS.map { :"#{_1}_id" }).flatten.compact.to_set
+      from_history = GarmentWear.where(user:, worn_on: RECENTLY_WORN_WINDOW.ago.to_date..).pluck(:garment_id)
+      from_outfits = OutfitRecommendation.joins(:week_plan).where(week_plans: { user_id: user.id })
+                                         .where(worn_at: RECENTLY_WORN_WINDOW.ago..)
+                                         .pluck(*SLOTS.map { :"#{_1}_id" }).flatten
+      (from_history + from_outfits).compact.to_set
     end
   end
 end
