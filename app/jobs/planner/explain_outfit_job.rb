@@ -54,7 +54,8 @@ module Planner
     def template_explanation(rec)
       day_name = rec.date.strftime("%A")
       event = rec.event_type.tr("_", " ")
-      "For your #{day_name} #{event}, we've put together the best available pieces from your wardrobe."
+      occasion = rec.segment_label.present? ? "#{day_name} (#{rec.segment_label})" : "#{day_name} #{event}"
+      "For your #{occasion}, we've put together the best available pieces from your wardrobe."
     end
 
     def broadcast_card(rec, user)
@@ -64,6 +65,13 @@ module Planner
         target: ActionView::RecordIdentifier.dom_id(rec),
         partial: "outfits/day_card",
         locals: { rec: }
+      )
+      # Issue #8: the same outfit on the /outfits/today timeline.
+      Turbo::StreamsChannel.broadcast_replace_to(
+        [ user, :planner ],
+        target: ActionView::RecordIdentifier.dom_id(rec, :timeline),
+        partial: "today_outfits/segment",
+        locals: { outfit: rec }
       )
     end
   end
