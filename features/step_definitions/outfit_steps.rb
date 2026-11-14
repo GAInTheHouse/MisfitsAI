@@ -16,7 +16,9 @@ When("I hide {string} from the outfit detail") do |garment_name|
   end
   find("button[title='#{garment_name}']").click
   within("dialog[open], dialog:not([style*='display: none'])") do
-    click_button "Hide from outfits"
+    within(find("p.font-medium", exact_text: garment_name).ancestor("div.flex.items-center")) do
+      click_button "Hide from outfits"
+    end
   end
 end
 
