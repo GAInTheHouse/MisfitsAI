@@ -47,7 +47,11 @@ Rails.application.routes.draw do
   # /outfits/today is not read as an outfit id.
   get "outfits/today", to: "today_outfits#show", as: :today_outfits
   patch "outfits/:id/wear", to: "outfit_wears#update", as: :wear_outfit
-  resources :outfits, only: [ :index, :show ]
+  resources :outfits, only: [ :index, :show ] do
+    collection do
+      post :regenerate
+    end
+  end
   get "weather" => "weather#show"
 
   resource :avatar, only: [ :create, :show ]
