@@ -51,7 +51,7 @@ Then("my week should be:") do |table|
 end
 
 Then("I should see {int} day cards") do |count|
-  expect(page).to have_css('[id^="outfit_recommendation_"]', minimum: count)
+  expect(page).to have_css('[id^="outfit_recommendation_"]', minimum: count, visible: :all)
 end
 
 Then(/^(\w+)'s outfit should include "([^"]+)"/) do |day_name, garment_name|

@@ -1,18 +1,74 @@
 <% content_for :title, "Your Outfits" %>
+<% week_days = (0..6).map { |i| @week_plan.week_start + i } %>
 
 <div class="max-w-3xl mx-auto px-4 py-8">
-  <h1 class="text-2xl font-semibold mb-6">Your Outfits</h1>
+  <div class="flex items-center justify-between mb-6 gap-4 flex-wrap">
+    <h1 class="text-2xl font-semibold">Your Outfits</h1>
+    <div class="flex gap-2">
+      <%= link_to "← Calendar", week_plan_path, class: "btn-ghost text-sm px-3 py-1" %>
+      <%= button_to "Regenerate week", regenerate_outfits_path,
+            method: :post,
+            class: "btn-primary text-sm px-3 py-1" %>
+    </div>
+  </div>
 
-  <% if @outfits.empty? %>
-    <div class="text-center py-16 text-[var(--muted)]">
-      <p class="mb-4">No outfits yet. Complete the calendar step to get recommendations.</p>
+  <% if @recs_by_day.empty? %>
+    <div class="text-center py-16" style="color: var(--muted);">
+      <p class="mb-4">No outfits yet. Generate outfits from the calendar page.</p>
       <%= link_to "Go to Calendar", week_plan_path, class: "btn-primary px-5 py-2" %>
     </div>
   <% else %>
-    <div class="space-y-4">
-      <% @outfits.each do |rec| %>
-        <%= render "outfits/day_card", rec: %>
+    <div data-controller="shared--tabs" data-shared--tabs-index-value="<%= @selected_day %>">
+      <div role="tablist" class="flex border-b mb-6" style="border-color: var(--line);">
+        <% week_days.each_with_index do |day, i| %>
+          <button role="tab"
+                  data-shared--tabs-target="tab"
+                  data-action="click->shared--tabs#select"
+                  class="flex-1 py-2 text-sm font-medium text-center transition-colors hover:text-[var(--ink)]">
+            <span class="block"><%= day.strftime("%a") %></span>
+            <span class="block text-xs" style="color: var(--muted);"><%= day.strftime("%-d") %></span>
+          </button>
+        <% end %>
+      </div>
+
+      <% week_days.each_with_index do |_day, i| %>
+        <div data-shared--tabs-target="panel"<%= i != @selected_day ? ' hidden' : '' %>>
+          <% day_recs = @recs_by_day[i] || [] %>
+          <% if day_recs.any? %>
+            <div class="space-y-4">
+              <% day_recs.each do |rec| %>
+                <%= render "outfits/day_card", rec:,
+                      avatar_ready: @avatar_ready,
+                      preview_enabled: @preview_enabled %>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="text-center py-12 text-sm" style="color: var(--muted);">No outfit planned for this day.</p>
+          <% end %>
+        </div>
       <% end %>
     </div>
+
+    <section class="mt-10">
+      <h2 class="text-sm font-semibold mb-3 uppercase tracking-wide" style="color: var(--muted);">Week at a glance</h2>
+      <div class="rounded-xl border divide-y" style="border-color: var(--line);">
+        <% week_days.each_with_index do |day, i| %>
+          <div class="flex gap-3 px-4 py-3 text-sm items-baseline">
+            <span class="w-14 shrink-0 font-medium"><%= day.strftime("%a %-d") %></span>
+            <% first_rec = @recs_by_day[i]&.first %>
+            <% if first_rec %>
+              <span class="w-28 shrink-0" style="color: var(--muted);">
+                <%= Planner::Prompts.event_label(first_rec.event_type) %>
+              </span>
+              <span class="truncate" style="color: var(--muted);">
+                <%= first_rec.garments_in_display_order.map(&:name).join(", ").presence || "—" %>
+              </span>
+            <% else %>
+              <span style="color: var(--muted);">—</span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </section>
   <% end %>
 </div>

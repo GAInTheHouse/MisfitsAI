@@ -35,7 +35,7 @@ module Planner
       begin
         text = client.generate_text(
           kind: :outfit_explanation,
-          prompt: "#{prompt}\n#{facts.join("\n")}",
+          prompt: "#{prompt}\n#{facts.map { |f| f[:text] || f["text"] }.join("\n")}",
           system:,
           temperature: 0.7,
           max_output_tokens: 120,

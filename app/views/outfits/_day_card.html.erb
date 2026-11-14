@@ -1,27 +1,92 @@
-<%= turbo_frame_tag dom_id(rec) do %>
-  <div class="rounded-xl border border-[var(--line)] p-4 flex gap-4 items-start">
-    <div class="text-sm font-medium w-24 shrink-0 text-[var(--muted)]">
-      <%= rec.date.strftime("%a, %b %-d") %>
-    </div>
+<%# locals: (rec:, avatar_ready: nil, preview_enabled: nil) %>
+<% _preview_enabled = preview_enabled.nil? ? Feature.enabled?(:outfit_preview) : preview_enabled %>
+<% _avatar_ready    = if avatar_ready.nil?
+                         profile = rec.week_plan.user.profile
+                         profile&.avatar_status == "ready" && profile&.avatar&.attached?
+                       else
+                         avatar_ready
+                       end %>
+<% missing_top    = rec.top.nil? && rec.dress.nil? %>
+<% missing_bottom = rec.bottom.nil? && rec.dress.nil? %>
 
-    <div class="flex-1 min-w-0">
-      <div class="flex flex-wrap gap-2 mb-3">
-        <% rec.garments_in_display_order.each do |g| %>
-          <%= turbo_frame_tag dom_id(g, :thumb), class: "w-12 h-12 rounded-lg overflow-hidden border border-[var(--line)]" do %>
-            <%= render "garments/thumb", garment: g %>
-          <% end %>
+<%= turbo_frame_tag dom_id(rec) do %>
+  <div data-controller="shared--modal"
+       class="rounded-xl border p-4 space-y-4" style="border-color: var(--line);">
+
+    <div class="flex items-baseline justify-between gap-2">
+      <div>
+        <span class="text-sm font-medium"><%= Planner::Prompts.event_label(rec.event_type) %></span>
+        <% if rec.segment_label.present? %>
+          <span class="ml-2 text-xs px-2 py-0.5 rounded-full" style="background: var(--panel-strong); color: var(--muted);">
+            <%= rec.segment_label %>
+          </span>
         <% end %>
       </div>
-
-      <% if rec.explanation.present? %>
-        <p class="text-xs text-[var(--muted)] mb-3"><%= rec.explanation %></p>
-      <% elsif rec.explanation_status == "pending" %>
-        <p class="text-xs text-[var(--muted)] animate-pulse mb-3">Generating explanation…</p>
-      <% end %>
-
-      <%= turbo_frame_tag dom_id(rec, :on_me) do %>
-        <%= render "outfit_previews/preview", rec: rec if defined?(Feature) && Feature.enabled?(:outfit_preview) %>
-      <% end %>
+      <span class="text-xs shrink-0" style="color: var(--muted);"><%= rec.date.strftime("%B %-d") %></span>
     </div>
+
+    <% if missing_top || missing_bottom %>
+      <%= render "outfits/missing_banner", missing_top:, missing_bottom: %>
+    <% end %>
+
+    <% if rec.explanation.present? %>
+      <p class="text-sm" style="color: var(--muted);"><%= rec.explanation %></p>
+    <% elsif rec.explanation_status == "pending" %>
+      <div class="animate-pulse rounded h-4 w-3/4" style="background: var(--panel-strong);"></div>
+    <% end %>
+
+    <% if _preview_enabled && _avatar_ready %>
+      <div data-controller="shared--tabs" data-shared--tabs-index-value="0">
+        <div class="flex gap-2 mb-3">
+          <button role="tab" data-shared--tabs-target="tab" data-action="click->shared--tabs#select"
+                  class="btn-ghost text-xs px-3 py-1">Items</button>
+          <button role="tab" data-shared--tabs-target="tab" data-action="click->shared--tabs#select"
+                  class="btn-ghost text-xs px-3 py-1">On Me</button>
+        </div>
+        <div data-shared--tabs-target="panel">
+          <%= render "outfits/garment_collage", rec:, modal_id: "outfit_detail_#{rec.id}" %>
+        </div>
+        <div data-shared--tabs-target="panel" hidden>
+          <%= turbo_frame_tag dom_id(rec, :on_me) do %>
+            <%= render "outfit_previews/preview", rec: %>
+          <% end %>
+        </div>
+      </div>
+    <% elsif _preview_enabled %>
+      <%= render "outfits/garment_collage", rec:, modal_id: "outfit_detail_#{rec.id}" %>
+      <%= turbo_frame_tag dom_id(rec, :on_me) do %>
+        <%= render "outfit_previews/preview", rec: %>
+      <% end %>
+    <% else %>
+      <%= render "outfits/garment_collage", rec:, modal_id: "outfit_detail_#{rec.id}" %>
+    <% end %>
+
+    <%= render "shared/modal", id: "outfit_detail_#{rec.id}",
+          title: "#{rec.date.strftime('%A, %B %-d')} – #{Planner::Prompts.event_label(rec.event_type)}" do %>
+      <div class="space-y-3 max-h-80 overflow-y-auto">
+        <% if rec.garments_in_display_order.any? %>
+          <% rec.garments_in_display_order.each do |g| %>
+            <div class="flex items-center gap-3 py-2 border-b" style="border-color: var(--line);">
+              <div class="w-12 h-12 rounded-lg border overflow-hidden shrink-0" style="border-color: var(--line);">
+                <%= render "garments/thumb", garment: g %>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate"><%= g.name %></p>
+                <p class="text-xs capitalize" style="color: var(--muted);"><%= g.category %></p>
+              </div>
+              <%= button_to g.hidden_from_recommendations ? "Show in outfits" : "Hide from outfits",
+                    hide_garment_path(g),
+                    method: :patch,
+                    params: { hidden: !g.hidden_from_recommendations },
+                    class: "btn-ghost text-xs px-3 py-1 shrink-0",
+                    data: { turbo: false } %>
+            </div>
+          <% end %>
+        <% else %>
+          <p class="text-sm text-center py-4" style="color: var(--muted);">No items in this outfit.</p>
+        <% end %>
+      </div>
+    <% end %>
+
   </div>
 <% end %>
