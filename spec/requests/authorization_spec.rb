@@ -54,6 +54,32 @@ RSpec.describe "Authorization", type: :request do
     end
   end
 
+  describe "planner (Phase 3)" do
+    let(:plan) { create(:week_plan, user: user_a) }
+    let!(:event) { create(:week_event, week_plan: plan) }
+
+    it "returns 404 for another user's week event update" do
+      patch week_plan_event_path(event), params: { week_event: { event_type: "gym" } }
+      expect(response).to have_http_status(:not_found)
+      expect(event.reload.event_type).to eq("work_meeting")
+    end
+
+    it "returns 404 for another user's outfit" do
+      outfit = create(:outfit_recommendation, week_plan: plan)
+      get outfit_path(outfit)
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "does not list another user's outfits or week" do
+      create(:outfit_recommendation, week_plan: plan, explanation: "Secret outfit note")
+      event.update!(original_summary: "Secret board meeting")
+      get outfits_path
+      expect(response.body).not_to include("Secret outfit note")
+      get week_plan_path
+      expect(response.body).not_to include("Secret board meeting")
+    end
+  end
+
   describe "receipts (Phase 2)" do
     let(:receipt) { create(:intake_batch, :receipt, user: user_a, status: "ready") }
     let!(:row) { create(:garment_draft, :ready, intake_batch: receipt) }

@@ -1,0 +1,10 @@
+<%# locals: week_plan, event_options (optional) %>
+<% event_options ||= ::Options.fetch(:event_types).map { |e| [ e[:key], e[:label] ] } %>
+<% time_zone = week_plan.user.time_zone %>
+<%= turbo_frame_tag "week_plan" do %>
+  <div class="space-y-3">
+    <% week_plan.week_events.includes(:calendar_events).order(:date).each do |event| %>
+      <%= render "week_plans/day_row", event:, event_options:, time_zone: %>
+    <% end %>
+  </div>
+<% end %>

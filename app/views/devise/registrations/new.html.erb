@@ -1,0 +1,26 @@
+<%= render layout: "devise/shared/card", locals: { title: "Sign up" } do %>
+  <%= form_for(resource, as: resource_name, url: registration_path(resource_name), html: { class: "space-y-4" }) do |f| %>
+    <%= render "devise/shared/error_messages", resource: resource %>
+
+    <div class="space-y-1">
+      <%= f.label :email, class: "text-sm font-medium" %>
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", required: true, class: "input" %>
+    </div>
+
+    <div class="space-y-1">
+      <%= f.label :password, class: "text-sm font-medium" %>
+      <%= f.password_field :password, autocomplete: "new-password", required: true, class: "input",
+            aria: { describedby: "password_requirements" } %>
+      <p id="password_requirements" class="text-xs text-[var(--muted)]">8 characters minimum</p>
+    </div>
+
+    <div class="space-y-1">
+      <%= f.label :password_confirmation, "Password confirmation", class: "text-sm font-medium" %>
+      <%= f.password_field :password_confirmation, autocomplete: "new-password", required: true, class: "input" %>
+    </div>
+
+    <%= f.submit "Sign up", class: "btn-primary w-full" %>
+  <% end %>
+
+  <%= render "devise/shared/links" %>
+<% end %>

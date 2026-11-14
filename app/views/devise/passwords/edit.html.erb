@@ -1,0 +1,22 @@
+<%= render layout: "devise/shared/card", locals: { title: "Change your password" } do %>
+  <%= form_for(resource, as: resource_name, url: password_path(resource_name), html: { method: :put, class: "space-y-4" }) do |f| %>
+    <%= render "devise/shared/error_messages", resource: resource %>
+    <%= f.hidden_field :reset_password_token %>
+
+    <div class="space-y-1">
+      <%= f.label :password, "New password", class: "text-sm font-medium" %>
+      <%= f.password_field :password, autofocus: true, autocomplete: "new-password", required: true, class: "input",
+            aria: { describedby: "new_password_requirements" } %>
+      <p id="new_password_requirements" class="text-xs text-[var(--muted)]">8 characters minimum</p>
+    </div>
+
+    <div class="space-y-1">
+      <%= f.label :password_confirmation, "Confirm new password", class: "text-sm font-medium" %>
+      <%= f.password_field :password_confirmation, autocomplete: "new-password", required: true, class: "input" %>
+    </div>
+
+    <%= f.submit "Change my password", class: "btn-primary w-full" %>
+  <% end %>
+
+  <%= render "devise/shared/links" %>
+<% end %>

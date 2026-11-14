@@ -1,0 +1,11 @@
+<div class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-xs">
+  <div class="flex items-center gap-1.5">
+    <% if garment.in_laundry? %>
+      <span class="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">In Laundry (<%= garment.wears_since_wash %>/<%= garment.effective_wash_threshold %>)</span>
+    <% else %>
+      <span class="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">Clean · <%= garment.wears_since_wash %>/<%= garment.effective_wash_threshold %></span>
+    <% end %>
+    <span class="text-slate-500"><%= garment.wear_count %> <%= "wear".pluralize(garment.wear_count) %></span>
+  </div>
+  <%= button_to(garment.in_laundry? ? "Mark Washed" : "To Laundry", laundry_garment_path(garment), method: :patch, class: "rounded-md border border-slate-300 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-50") %>
+</div>

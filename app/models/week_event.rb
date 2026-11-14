@@ -2,6 +2,7 @@
 
 class WeekEvent < ApplicationRecord
   belongs_to :week_plan
+  has_many :calendar_events, -> { order(:position) }, dependent: :delete_all, inverse_of: :week_event
 
   EVENT_TYPES = %w[work_meeting date_night gym casual none].freeze
 

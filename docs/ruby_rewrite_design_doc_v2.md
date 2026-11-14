@@ -1752,7 +1752,7 @@ heroku create misfit-ai --stack heroku-24
 heroku addons:create heroku-postgresql:essential-0
 heroku buildpacks:set heroku/ruby
 heroku config:set RAILS_ENV=production RACK_ENV=production SOLID_QUEUE_IN_PUMA=1 \
-  WEB_CONCURRENCY=1 RAILS_MAX_THREADS=3 JOB_CONCURRENCY=1 MALLOC_ARENA_MAX=2 \
+  WEB_CONCURRENCY=0 RAILS_MAX_THREADS=3 JOB_CONCURRENCY=1 MALLOC_ARENA_MAX=2 \
   RAILS_LOG_TO_STDOUT=enabled RAILS_SERVE_STATIC_FILES=enabled
 heroku ps:type web=basic
 ```
@@ -1765,7 +1765,7 @@ web: bundle exec puma -C config/puma.rb
 release: bin/rails db:migrate
 ```
 
-- `config/puma.rb`: the Rails 8 default, which includes `plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]`, plus `threads 3, 3` and `workers ENV.fetch("WEB_CONCURRENCY", 1)`.
+- `config/puma.rb`: Puma uses `RAILS_MAX_THREADS` for its thread pool and enables Solid Queue when `SOLID_QUEUE_IN_PUMA` is set. Heroku sets `WEB_CONCURRENCY=0` to run Puma in single-process mode.
 - `config/queue.yml` (production):
 
 ```yaml
@@ -1826,7 +1826,7 @@ Note: refresh tokens issued to an app in Testing mode **expire after 7 days**. T
 | `RAILS_MASTER_KEY` | yes | from `config/master.key` | Rails (AR encryption keys live in credentials) |
 | `DATABASE_URL` | auto | set by the add-on | Rails |
 | `SOLID_QUEUE_IN_PUMA` | yes | `1` | Puma |
-| `WEB_CONCURRENCY`, `RAILS_MAX_THREADS`, `JOB_CONCURRENCY` | yes | `1`, `3`, `1` | Puma, Solid Queue |
+| `WEB_CONCURRENCY`, `RAILS_MAX_THREADS`, `JOB_CONCURRENCY` | yes | `0`, `3`, `1` | Puma, Solid Queue |
 | `APP_HOST` | yes | `misfit-ai.herokuapp.com` | mailer URLs, OmniAuth full host |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | yes | | OmniAuth, token refresh |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | yes | (whole JSON) | Vertex, Discovery Engine, GCS, GA4 |
