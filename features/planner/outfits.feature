@@ -75,6 +75,6 @@ Feature: Weekly outfit recommendations
 
   Scenario: Missing bottom shows a banner linking to wardrobe
     Given Monday has an outfit with no bottom
-    When I visit "/outfits"
+    When I visit "/outfits?day=0"
     Then I should see "Missing bottom"
     And I should see a link to "/wardrobe"
