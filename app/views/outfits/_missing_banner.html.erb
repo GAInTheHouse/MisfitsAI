@@ -1,0 +1,8 @@
+<%# locals: (missing_top:, missing_bottom:) %>
+<% slots = [ ("top" if missing_top), ("bottom" if missing_bottom) ].compact %>
+<div class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm" style="background: var(--panel-strong);">
+  <span style="color: var(--muted);">
+    Missing <%= slots.to_sentence %> —
+    <%= link_to "add to wardrobe", wardrobe_path, class: "underline font-medium", style: "color: var(--ink);" %>.
+  </span>
+</div>

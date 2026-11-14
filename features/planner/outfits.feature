@@ -60,3 +60,21 @@ Feature: Weekly outfit recommendations
     Given the "outfit_preview" feature is enabled
     When I generate outfits for my week
     Then I should see "Generate look"
+
+  Scenario: Hide an item from an outfit removes it from recommendations
+    When I generate outfits for my week
+    And background jobs finish
+    And I visit "/outfits"
+    And I hide "White Oxford Shirt" from the outfit detail
+    Then "White Oxford Shirt" should be hidden from recommendations
+
+  Scenario: Regenerate week creates a new set of outfits
+    When I generate outfits for my week
+    And I regenerate the week
+    Then I should see 7 day cards
+
+  Scenario: Missing bottom shows a banner linking to wardrobe
+    Given Monday has an outfit with no bottom
+    When I visit "/outfits"
+    Then I should see "Missing bottom"
+    And I should see a link to "/wardrobe"
