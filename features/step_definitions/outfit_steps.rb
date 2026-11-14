@@ -6,6 +6,14 @@ When("I regenerate the week") do
 end
 
 When("I hide {string} from the outfit detail") do |garment_name|
+  garment = @user.garments.find_by!(name: garment_name)
+  plan = @user.week_plans.order(:week_start).last
+  rec = plan.outfit_recommendations.includes(:top, :bottom, :dress, :outerwear, :shoes).detect do |r|
+    r.garments_in_display_order.map(&:id).include?(garment.id)
+  end
+  if rec
+    visit outfits_path(day: (rec.date - plan.week_start).to_i)
+  end
   find("button[title='#{garment_name}']").click
   within("dialog[open], dialog:not([style*='display: none'])") do
     click_button "Hide from outfits"

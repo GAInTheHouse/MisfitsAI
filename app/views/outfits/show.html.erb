@@ -23,7 +23,7 @@
     <p class="text-sm mb-6" style="color: var(--muted);"><%= @outfit.explanation %></p>
   <% end %>
 
-  <% if @preview_enabled && @avatar_ready %>
+  <% if @preview_enabled %>
     <div class="border rounded-xl p-4" style="border-color: var(--line);">
       <h2 class="text-sm font-semibold mb-4">On Me</h2>
       <%= turbo_frame_tag dom_id(@outfit, :on_me) do %>

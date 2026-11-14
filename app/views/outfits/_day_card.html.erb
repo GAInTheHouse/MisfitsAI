@@ -35,7 +35,7 @@
       <div class="animate-pulse rounded h-4 w-3/4" style="background: var(--panel-strong);"></div>
     <% end %>
 
-    <% if _preview_enabled && _avatar_ready %>
+    <% if _preview_enabled %>
       <div data-controller="shared--tabs" data-shared--tabs-index-value="0">
         <div class="flex gap-2 mb-3">
           <button role="tab" data-shared--tabs-target="tab" data-action="click->shared--tabs#select"
