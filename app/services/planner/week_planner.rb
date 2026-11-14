@@ -55,7 +55,7 @@ module Planner
                           time_zone: user.time_zone)
       end
 
-      forecasts = segments.map(&:date).uniq.to_h { |d| [d, (Planner::Weather.forecast_for(location: 'New York, NY', date: d) rescue nil)] }
+      forecasts = segments.map(&:date).uniq.to_h { |d| [ d, (Planner::Weather.forecast_for(location: "New York, NY", date: d) rescue nil) ] }
 
       suggestions = RecommendationEngine.call(
         forecasts:,

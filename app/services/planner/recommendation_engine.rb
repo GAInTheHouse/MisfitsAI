@@ -95,7 +95,7 @@ module Planner
         if weather
           temp = (weather[:temp_f] || weather[:temp]).to_i
           outerwear = nil if temp > 80
-          outerwear ||= pool.select { |g| g.category == 'outerwear' }.first if temp < 60
+          outerwear ||= pool.select { |g| g.category == "outerwear" }.first if temp < 60
         end
         shoes     = pick_shoes(pool, type:, chain:, label:, used:)
 
