@@ -106,4 +106,18 @@ RSpec.describe Planner::WeekPlanner, type: :service do
       expect(described_class.recently_worn_ids(user)).to contain_exactly(worn.id)
     end
   end
+
+  describe "weather location" do
+    it "asks for the user's own city when generating outfits" do
+      user.update!(time_zone: "Asia/Tokyo")
+      create(:garment, :top, user:, formality: "casual")
+      create(:garment, :bottom, user:, formality: "casual")
+      allow(Planner::Weather).to receive(:forecast_for).and_call_original
+
+      described_class.generate!(user:, week_plan: described_class.ensure_week!(user:))
+
+      expect(Planner::Weather).to have_received(:forecast_for).with(location: "Tokyo", date: anything).at_least(:once)
+      expect(Planner::Weather).not_to have_received(:forecast_for).with(hash_including(location: "New York, NY"))
+    end
+  end
 end

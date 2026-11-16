@@ -44,11 +44,11 @@ module Planner
     # events: anything with #date and #event_type, in order: WeekEvents (one outfit per day) or
     # Planner::Segments (issue #8, one outfit per time block; a segment's #chain overrides the formality chain).
     # recently_worn_ids: garment ids the user confirmed wearing lately; they lose ties to unworn pieces.
-    def self.call(garments:, events:, context:, recently_worn_ids: Set.new)
-      new(garments:, events:, context:, recently_worn_ids:).call
+    def self.call(garments:, events:, context:, recently_worn_ids: Set.new, forecasts: {})
+      new(garments:, events:, context:, recently_worn_ids:, forecasts:).call
     end
 
-    def initialize(garments:, events:, context:, recently_worn_ids: Set.new)
+    def initialize(garments:, events:, context:, recently_worn_ids: Set.new, forecasts: {})
       @garments = garments
       @events = events
       @context = context
@@ -56,6 +56,7 @@ module Planner
       @avoid_words = color_word_set(@context.avoided_colors)
       @fav_words = color_word_set(@context.favorite_colors)
       @tone = @context.color_tone&.to_s&.downcase
+      @forecasts = forecasts
     end
 
     def call
@@ -64,6 +65,7 @@ module Planner
       used  = Set.new
 
       @events.each_with_index.map do |event, day_index|
+        weather = @forecasts[event.date]
         displayed = event.event_type
         type      = displayed == "none" ? "casual" : displayed
         chain     = (event.chain if event.respond_to?(:chain)) || FORMALITY_CHAINS.fetch(type, FALLBACK_CHAIN)
@@ -90,6 +92,11 @@ module Planner
         [ top, bottom, dress ].compact.each { used << _1.id }
 
         outerwear = pick_outerwear(pool, top:, displayed:, day_index:)
+        if weather
+          temp = (weather[:temp_f] || weather[:temp]).to_i
+          outerwear = nil if temp > 80
+          outerwear ||= pool.select { |g| g.category == "outerwear" }.first if temp < 60
+        end
         shoes     = pick_shoes(pool, type:, chain:, label:, used:)
 
         DaySuggestion.new(

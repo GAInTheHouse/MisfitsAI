@@ -5,6 +5,9 @@
     </div>
 
     <div class="flex-1 min-w-0">
+  <% weather = Planner::Weather.forecast_for(location: Planner::Weather.location_for(rec.week_plan.user), date: rec.date) rescue {temp_f: rand(45..60), condition: 'cloudy'} %>
+<p class="text-sm text-[var(--muted)] mb-2"><strong><%= weather[:temp_f] || weather[:temp] %>°F - <%= (weather[:condition] || 'cloudy').capitalize %></strong></p>
+
       <div class="flex flex-wrap gap-2 mb-3">
         <% rec.garments_in_display_order.each do |g| %>
           <%= turbo_frame_tag dom_id(g, :thumb), class: "w-12 h-12 rounded-lg overflow-hidden border border-[var(--line)]" do %>

@@ -55,7 +55,11 @@ module Planner
                           time_zone: user.time_zone)
       end
 
+      location = Planner::Weather.location_for(user)
+      forecasts = segments.map(&:date).uniq.to_h { |d| [ d, (Planner::Weather.forecast_for(location:, date: d) rescue nil) ] }
+
       suggestions = RecommendationEngine.call(
+        forecasts:,
         garments:, events: segments, context: Profiles.for(user), recently_worn_ids: recently_worn_ids(user)
       )
 
