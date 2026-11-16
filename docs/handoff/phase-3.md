@@ -47,5 +47,5 @@
 - [DECISION] A manual pill change or the demo week clears that day's `calendar_events`, so a manual choice always means one outfit.
 
 ### Not done here
-- Laundry status in recommendations: it needs #9's data, so it is a follow-up once #9 merges.
+- Laundry status: done after #9 merged. #9 made `pick` and outerwear prefer clean pieces. #8's follow-up does the same for gym shoes, counts only clean pieces when deciding whether work and dinner can share an outfit, adds #9's wear history (including manual wears) to the 7-day recent-wear penalty, and flags pieces from the laundry on the timeline.
 - `/outfits` still lists every outfit (now including every segment) in the existing card layout; the full Outfits page is #30.

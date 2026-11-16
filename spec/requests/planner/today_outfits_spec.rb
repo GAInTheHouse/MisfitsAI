@@ -51,6 +51,13 @@ RSpec.describe "Today's outfits timeline (issue #8)", type: :request do
     end
   end
 
+  it "flags pieces that are in the laundry (#9)" do
+    shirt.update!(laundry_status: "in_laundry")
+    outfit(date: Date.new(2026, 10, 21), event_type: "casual")
+    get today_outfits_path
+    expect(Nokogiri::HTML(response.body).at_css(".timeline-segment").text).to include("Oxford Shirt", "In laundry")
+  end
+
   it "asks to plan the week when there are no outfits" do
     get today_outfits_path
     expect(response.body).to include("Plan your week first.")

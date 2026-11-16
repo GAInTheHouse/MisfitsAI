@@ -35,6 +35,10 @@
               <%= render "garments/thumb", garment: %>
             </div>
             <span class="text-[11px] leading-tight mt-1 line-clamp-2"><%= garment.name %></span>
+            <% if garment.in_laundry? %>
+              <%# The engine only uses a piece from the laundry when nothing clean fits this slot (#9). %>
+              <span class="text-[10px] mt-0.5" style="color: var(--error);">In laundry</span>
+            <% end %>
           </li>
         <% end %>
       </ul>

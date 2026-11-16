@@ -151,3 +151,16 @@ end
 When("I mark outfit {int} on the timeline as worn") do |position|
   within(all(".timeline-segment")[position - 1]) { click_button "I wore this" }
 end
+
+# Issues #8 and #9: laundry-aware planning.
+Given("my wardrobe also contains a clean {string} top") do |name|
+  create(:garment, :top, user: @user, name:, formality: "casual", sub_category: "t_shirt", times_recommended: 5)
+end
+
+Given("{string} is in the laundry") do |name|
+  @user.garments.find_by!(name:).send_to_laundry!
+end
+
+Then("outfit {int} on the timeline should not include {string}") do |position, name|
+  expect(all(".timeline-segment")[position - 1]).not_to have_content(name)
+end
