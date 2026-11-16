@@ -8,8 +8,20 @@ module Planner
     DEFAULT_TEMP_F = 72
     DEFAULT_CONDITION = "Sunny"
 
+    DEFAULT_LOCATION = "New York"
+
     def self.forecast_for(location:, date: Date.current)
       new(location: location, date: date).fetch_forecast
+    end
+
+    # The user's city from their time zone ("America/New_York" -> "New York"), the same rule the week plan,
+    # outfits and weather controllers use. OpenWeatherMap's q= rejects "New York, NY" (404), which would
+    # silently fall back to the default forecast.
+    def self.location_for(user)
+      zone = user&.time_zone.to_s
+      iana = ActiveSupport::TimeZone::MAPPING[zone] || zone
+      city = iana.split("/").last&.tr("_", " ") if iana.include?("/") && !iana.start_with?("Etc/") # Etc/UTC: no city
+      city.presence || DEFAULT_LOCATION
     end
 
     def initialize(location:, date: Date.current)

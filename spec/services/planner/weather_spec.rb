@@ -30,4 +30,17 @@ RSpec.describe Planner::Weather, type: :service do
       date: Date.new(2026, 11, 13)
     )
   end
+
+  describe ".location_for" do
+    it "uses the city from the user's time zone, in a form OpenWeatherMap accepts" do
+      expect(described_class.location_for(build(:user, time_zone: "America/New_York"))).to eq("New York")
+      expect(described_class.location_for(build(:user, time_zone: "Pacific/Auckland"))).to eq("Auckland")
+      expect(described_class.location_for(build(:user, time_zone: "Eastern Time (US & Canada)"))).to eq("New York")
+    end
+
+    it "falls back to New York when the zone has no city" do
+      expect(described_class.location_for(build(:user, time_zone: "UTC"))).to eq("New York")
+      expect(described_class.location_for(nil)).to eq("New York")
+    end
+  end
 end

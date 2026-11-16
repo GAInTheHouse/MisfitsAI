@@ -5,7 +5,7 @@
     </div>
 
     <div class="flex-1 min-w-0">
-  <% weather = Planner::Weather.forecast_for(location: 'New York, NY', date: rec.date) rescue {temp_f: rand(45..60), condition: 'cloudy'} %>
+  <% weather = Planner::Weather.forecast_for(location: Planner::Weather.location_for(rec.week_plan.user), date: rec.date) rescue {temp_f: rand(45..60), condition: 'cloudy'} %>
 <p class="text-sm text-[var(--muted)] mb-2"><strong><%= weather[:temp_f] || weather[:temp] %>°F - <%= (weather[:condition] || 'cloudy').capitalize %></strong></p>
 
       <div class="flex flex-wrap gap-2 mb-3">
