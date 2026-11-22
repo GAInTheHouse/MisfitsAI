@@ -15,6 +15,7 @@ Feature: Onboarding
     And I select "White T-shirt", "Blue Jeans" and "White Sneakers" from the catalog
     And I continue through step 2
     And I click "Build My Wardrobe"
+    And I click "Skip for now"
     Then I should see "Your first week of outfits"
     When background jobs finish
     When I click "Enter My Wardrobe"
@@ -53,7 +54,7 @@ Feature: Onboarding
     Then I should see "Your style"
 
   Scenario: Enter My Wardrobe completes onboarding
-    Given I am on step 4 of onboarding
+    Given I am on step 5 of onboarding
     When I click "Enter My Wardrobe"
     Then I should be on the wardrobe page
     And I should be onboarded

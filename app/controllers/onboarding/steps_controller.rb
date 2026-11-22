@@ -21,6 +21,7 @@ module Onboarding
       when 2 then handle_step_2
       when 3 then handle_step_3
       when 4 then handle_step_4
+      when 5 then handle_step_5
       else redirect_to onboarding_path
       end
     end
@@ -91,7 +92,25 @@ module Onboarding
     end
 
     def handle_step_4
-      current_user.update!(onboarding_completed_at: Time.current, onboarding_step: 4)
+      return advance_to(5) if params[:skip].present?
+
+      file = params[:selfie]
+      if file.present?
+        result = Avatars::SelfieUpload.accept(file)
+        unless result.ok
+          flash.now[:alert] = result.error
+          @step = 4
+          render_step(4)
+          return
+        end
+        Avatars::SelfieUpload.enqueue!(current_user.profile, file)
+      end
+
+      advance_to(5)
+    end
+
+    def handle_step_5
+      current_user.update!(onboarding_completed_at: Time.current, onboarding_step: 5)
       redirect_to wardrobe_path, notice: "Welcome to your wardrobe!"
     end
 

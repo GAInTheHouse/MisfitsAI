@@ -1,3 +1,4 @@
+<% profile = rec.week_plan.user.profile %>
 <div id="on_me_<%= rec.id %>">
   <% if rec.preview_status == "ready" && rec.preview_image.attached? %>
     <div class="flex flex-col items-center gap-4">
@@ -18,24 +19,38 @@
   <% elsif rec.preview_status == "failed" %>
     <div class="text-center py-8 space-y-3">
       <p class="text-sm text-[var(--muted)]">Generation failed.</p>
-      <%= button_to "Try again", outfit_preview_path(outfit_id: rec.id),
-            class: "btn-ghost text-sm" %>
+      <% if outfit_preview_avatar_ready?(rec) %>
+        <%= button_to "Try again", outfit_preview_path(outfit_id: rec.id),
+              class: "btn-ghost text-sm",
+              data: { turbo_frame: dom_id(rec, :on_me) } %>
+      <% else %>
+        <%= render "outfit_previews/avatar_required", profile: profile %>
+      <% end %>
     </div>
 
   <% else %>
     <%# none / initial state %>
     <div class="flex flex-col items-center gap-4 py-8">
-      <div class="flex gap-3 flex-wrap justify-center">
-        <% rec.garments_in_display_order.each do |g| %>
-          <div class="w-16 h-16 rounded-lg border border-[var(--line)] overflow-hidden">
-            <%= render "garments/thumb", garment: g, class: "w-full h-full object-cover" %>
-          </div>
-        <% end %>
-      </div>
-      <%= button_to "Generate look",
-            outfit_preview_path(outfit_id: rec.id),
-            class: "btn-primary px-5 py-2 text-sm",
-            data: { turbo_frame: "on_me_#{rec.id}" } %>
+      <% if profile.avatar_status == "pending" %>
+        <div class="flex flex-col items-center gap-3 text-[var(--muted)]">
+          <%= render "shared/spinner" %>
+          <p class="text-sm">Generating your avatar…</p>
+        </div>
+      <% elsif outfit_preview_avatar_ready?(rec) %>
+        <div class="flex gap-3 flex-wrap justify-center">
+          <% rec.garments_in_display_order.each do |g| %>
+            <div class="w-16 h-16 rounded-lg border border-[var(--line)] overflow-hidden">
+              <%= render "garments/thumb", garment: g, class: "w-full h-full object-cover" %>
+            </div>
+          <% end %>
+        </div>
+        <%= button_to "Generate look",
+              outfit_preview_path(outfit_id: rec.id),
+              class: "btn-primary px-5 py-2 text-sm",
+              data: { turbo_frame: dom_id(rec, :on_me) } %>
+      <% else %>
+        <%= render "outfit_previews/avatar_required", profile: profile %>
+      <% end %>
     </div>
   <% end %>
 </div>

@@ -27,7 +27,7 @@ module DemoUser
     user.password_confirmation = password
     user.name = "Demo User"
     user.onboarding_completed_at = Time.current
-    user.onboarding_step = 4
+    user.onboarding_step = 5
     user.save!
     user
   end

@@ -40,7 +40,7 @@ class ApplicationController < ActionController::Base
     return if is_a?(Admin::BaseController)
     return if is_a?(Api::BaseController)
     return if controller_path.start_with?("onboarding/")
-    return if controller_path == "profiles" || controller_path == "measurements"
+    return if controller_path.in?(%w[profiles measurements avatars outfit_previews])
     return unless current_user
     return if current_user.onboarding_completed_at.present?
 
