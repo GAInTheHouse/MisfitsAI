@@ -56,8 +56,8 @@ Then("the {string} button should be disabled") do |button_text|
   expect(page).to have_button(button_text, disabled: true)
 end
 
-Given("I am on step 4 of onboarding") do
-  @user = create(:user, :onboarded_step_4)
+Given("I am on step {int} of onboarding") do |n|
+  @user = create(:user, :new_user, onboarding_step: n)
   login_as(@user, scope: :user)
   visit onboarding_path
 end

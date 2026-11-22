@@ -1,0 +1,22 @@
+<h1 class="text-2xl font-semibold mb-2">Your first week of outfits</h1>
+<p class="text-[var(--muted)] mb-6">We're putting together 7 looks for you. Explanations stream in as they're ready.</p>
+
+<%= turbo_stream_from current_user, :planner %>
+<%= turbo_stream_from current_user, :wardrobe %>
+<% if Feature.enabled?(:avatar) %>
+  <%= turbo_stream_from current_user, :avatar %>
+<% end %>
+
+<% if week_plan %>
+  <div class="space-y-3 mb-8">
+    <% week_plan.outfit_recommendations.order(:date).each do |rec| %>
+      <%= render "outfits/day_card", rec: %>
+    <% end %>
+  </div>
+<% else %>
+  <div class="text-[var(--muted)] text-sm mb-8">Setting up your outfits…</div>
+<% end %>
+
+<%= form_with url: onboarding_path, method: :patch, class: "flex justify-end" do %>
+  <button type="submit" class="btn-primary px-6 py-2">Enter My Wardrobe</button>
+<% end %>

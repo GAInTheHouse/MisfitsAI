@@ -35,3 +35,24 @@ end
 Then("I should be rate limited") do
   expect(page.status_code).to eq(429).or have_content("Retry later")
 end
+
+Given("another user has a planned week with an outfit") do
+  @other_user = create(:user, :onboarded, email: "planner-owner@example.com")
+  plan = create(:week_plan, user: @other_user)
+  @other_event = create(:week_event, week_plan: plan, event_type: "work_meeting")
+  @other_outfit = create(:outfit_recommendation, week_plan: plan)
+  @user = create(:user, :onboarded, email: "planner-intruder@example.com")
+  login_as(@user, scope: :user)
+end
+
+When("I try to view the other user's outfit") do
+  visit outfit_path(@other_outfit)
+end
+
+When("I try to change the other user's week event") do
+  page.driver.submit :patch, week_plan_event_path(@other_event), { week_event: { event_type: "gym" } }
+end
+
+Then("the other user's week event should be unchanged") do
+  expect(@other_event.reload.event_type).to eq("work_meeting")
+end

@@ -5,6 +5,7 @@ Feature: Outfit on me (avatar outfit preview)
 
   Background:
     Given the "avatar" feature is enabled
+    And the "outfit_preview" feature is enabled
     And I am signed in as an onboarded user
 
   Scenario: On Me tab is hidden without an avatar
@@ -12,6 +13,13 @@ Feature: Outfit on me (avatar outfit preview)
     And I do not have an avatar
     When I visit "/outfits"
     Then I should not see the "On Me" toggle
+
+  Scenario: Outfits without an avatar prompt for a profile photo
+    Given I have outfit recommendations for this week
+    And I do not have an avatar
+    When I visit "/outfits"
+    Then I should see "Upload a selfie on"
+    And I should not see "Content missing"
 
   Scenario: Generate look attaches a preview image
     Given I have an avatar

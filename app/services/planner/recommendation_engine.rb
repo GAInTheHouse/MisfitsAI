@@ -41,17 +41,22 @@ module Planner
     DRESS_SHOE_RE     = /\b(heel|pump|stiletto|oxford|loafer|wingtip|brogue)s?\b/i
     OUTERWEAR_EVENTS  = %w[work_meeting casual].to_set
 
-    def self.call(garments:, events:, context:)
-      new(garments:, events:, context:).call
+    # events: anything with #date and #event_type, in order: WeekEvents (one outfit per day) or
+    # Planner::Segments (issue #8, one outfit per time block; a segment's #chain overrides the formality chain).
+    # recently_worn_ids: garment ids the user confirmed wearing lately; they lose ties to unworn pieces.
+    def self.call(garments:, events:, context:, recently_worn_ids: Set.new, forecasts: {})
+      new(garments:, events:, context:, recently_worn_ids:, forecasts:).call
     end
 
-    def initialize(garments:, events:, context:)
+    def initialize(garments:, events:, context:, recently_worn_ids: Set.new, forecasts: {})
       @garments = garments
       @events = events
       @context = context
+      @recently_worn = recently_worn_ids.to_set
       @avoid_words = color_word_set(@context.avoided_colors)
       @fav_words = color_word_set(@context.favorite_colors)
       @tone = @context.color_tone&.to_s&.downcase
+      @forecasts = forecasts
     end
 
     def call
@@ -60,9 +65,10 @@ module Planner
       used  = Set.new
 
       @events.each_with_index.map do |event, day_index|
+        weather = @forecasts[event.date]
         displayed = event.event_type
         type      = displayed == "none" ? "casual" : displayed
-        chain     = FORMALITY_CHAINS.fetch(type, FALLBACK_CHAIN)
+        chain     = (event.chain if event.respond_to?(:chain)) || FORMALITY_CHAINS.fetch(type, FALLBACK_CHAIN)
         gym       = type == "gym" ? method(:gym_allowed?) : nil
         tiebreak  = type == "work_meeting" ? ->(g) { structured_jacket?(g) ? 1 : 0 } : nil
 
@@ -86,6 +92,11 @@ module Planner
         [ top, bottom, dress ].compact.each { used << _1.id }
 
         outerwear = pick_outerwear(pool, top:, displayed:, day_index:)
+        if weather
+          temp = (weather[:temp_f] || weather[:temp]).to_i
+          outerwear = nil if temp > 80
+          outerwear ||= pool.select { |g| g.category == "outerwear" }.first if temp < 60
+        end
         shoes     = pick_shoes(pool, type:, chain:, label:, used:)
 
         DaySuggestion.new(
@@ -203,15 +214,17 @@ module Planner
     end
 
     def pick(pool, type_fn, chain, used:, event_type:, label:, extra: nil, tiebreak: nil, allow_reuse: true)
-      candidates = pool.select do |g|
+      matching = pool.select do |g|
         type_fn.call(g) && !excluded_for_event?(g, event_type) && (extra.nil? || extra.call(g))
       end
+      clean_matching = matching.select(&:clean?)
+      candidates = clean_matching.any? ? clean_matching : matching
       return nil if candidates.empty?
 
       scores = candidates.index_with { color_score(_1) }
       candidates.sort_by! do |g|
         tb = tiebreak ? tiebreak.call(g) : 0
-        [ g.times_recommended, tb, -scores[g], g.id ]
+        [ @recently_worn.include?(g.id) ? 1 : 0, g.times_recommended, tb, -scores[g], g.id ]
       end
 
       tiers = chain.map(&:to_set) + [ :untagged ]
@@ -262,6 +275,8 @@ module Planner
 
       outer = pool.select { _1.category == "outerwear" }
       return nil if outer.empty?
+      clean_outer = outer.select(&:clean?)
+      outer = clean_outer if clean_outer.any?
 
       if top && (structured_jacket?(top) || STRUCTURED_TOP_RE.match?(blob(top)))
         filtered = outer.reject { structured_jacket?(_1) || blob(_1).include?("blazer") }
@@ -275,6 +290,10 @@ module Planner
     def pick_shoes(pool, type:, chain:, label:, used:)
       shoe_pool = pool.select { _1.category == "shoes" }
       return nil if shoe_pool.empty?
+
+      # Issue #8 / #9: like pick, prefer clean shoes; the gym branch and the fallbacks below skip pick.
+      clean_shoes = shoe_pool.select(&:clean?)
+      shoe_pool = clean_shoes if clean_shoes.any?
 
       if type == "gym"
         casual = shoe_pool.reject { DRESS_SHOE_RE.match?(blob(_1)) }

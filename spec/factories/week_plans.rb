@@ -21,3 +21,14 @@ FactoryBot.define do
     preview_status { "none" }
   end
 end
+
+FactoryBot.define do
+  factory :calendar_event do
+    association :week_event
+    summary { "Standup" }
+    event_type { "work_meeting" }
+    starts_at { Time.current.change(hour: 9) }
+    all_day { false }
+    position { 0 }
+  end
+end

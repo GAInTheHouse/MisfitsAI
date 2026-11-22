@@ -1,0 +1,5 @@
+<%# locals: message, tone (:notice or :alert). Rendered in the page and broadcast by Planner::CalendarSync. %>
+<div class="rounded-[var(--radius-md)] px-4 py-3 text-sm border mb-6" role="status"
+     style="background: var(--panel); border-color: var(--line); color: <%= tone.to_s == "alert" ? "var(--error)" : "var(--ink)" %>;">
+  <%= message %>
+</div>

@@ -33,22 +33,39 @@ module Planner
           e.event_type = event_type
           e.original_summary = nil
           e.save!
+          e.calendar_events.delete_all
         end
       end
       week_plan.update!(source: "demo")
       week_plan
     end
 
+    RECENTLY_WORN_WINDOW = 7.days
+    SLOTS = %i[top bottom dress outerwear shoes].freeze
+
+    # Issue #8: one recommendation per time block (Planner::DaySegmenter), segment 0 for a single-block day.
+    # Days with an outfit the user confirmed wearing are history: they are kept, not regenerated.
     def self.generate!(user:, week_plan:)
+      garments = user.garments.with_attached_image.to_a
+      worn_dates = week_plan.outfit_recommendations.where.not(worn_at: nil).distinct.pluck(:date).to_set
+      days = week_plan.week_events.includes(:calendar_events).order(:date).reject { worn_dates.include?(_1.date) }
+      ready = smart_casual_ready?(garments)
+      segments = days.flat_map do |day|
+        DaySegmenter.call(week_event: day, calendar_events: day.calendar_events.to_a, smart_casual_ready: ready,
+                          time_zone: user.time_zone)
+      end
+
+      location = Planner::Weather.location_for(user)
+      forecasts = segments.map(&:date).uniq.to_h { |d| [ d, (Planner::Weather.forecast_for(location:, date: d) rescue nil) ] }
+
       suggestions = RecommendationEngine.call(
-        garments: user.garments.with_attached_image.to_a,
-        events: week_plan.week_events.order(:date).to_a,
-        context: Profiles.for(user)
+        forecasts:,
+        garments:, events: segments, context: Profiles.for(user), recently_worn_ids: recently_worn_ids(user)
       )
 
       OutfitRecommendation.transaction do
-        week_plan.outfit_recommendations.destroy_all
-        recs = suggestions.map do |s|
+        week_plan.outfit_recommendations.where.not(date: worn_dates.to_a).destroy_all
+        recs = suggestions.zip(segments).map do |s, segment|
           week_plan.outfit_recommendations.create!(
             date: s.date,
             event_type: s.event_type,
@@ -57,18 +74,41 @@ module Planner
             dress: s.dress,
             outerwear: s.outerwear,
             shoes: s.shoes,
+            segment_index: segment.index,
+            starts_at: segment.starts_at,
+            ends_at: segment.ends_at,
+            segment_label: segment.label,
+            change_reason: segment.change_reason,
             explanation_status: "pending",
             preview_status: "none"
           )
         end
 
-        ids = suggestions.flat_map { [ _1.top, _1.bottom, _1.dress, _1.outerwear, _1.shoes ] }.compact.map(&:id)
+        ids = suggestions.flat_map { |s| SLOTS.map { s.public_send(_1) } }.compact.map(&:id)
         ids.tally.each { |id, n| Garment.where(id:).update_all([ "times_recommended = times_recommended + ?", n ]) }
 
         week_plan.update!(generated_at: Time.current)
         recs.each { ExplainOutfitJob.perform_later(_1.id) }
         recs
       end
+    end
+
+    # A work meeting and a date night can share one outfit only if the wardrobe has clean smart-casual pieces
+    # for it. Pieces in the laundry (#9) don't count, so the planner suggests a change instead.
+    def self.smart_casual_ready?(garments)
+      smart = garments.reject(&:hidden_from_recommendations).select { _1.clean? && _1.formality == "smart_casual" }
+      smart.any? { _1.category == "dress" } ||
+        (smart.any? { _1.category == "top" } && smart.any? { _1.category == "bottom" })
+    end
+
+    # Pieces worn in the last week: #9's wear history (outfit confirmations and manual "worn" marks), plus
+    # confirmed outfits from before that history existed.
+    def self.recently_worn_ids(user)
+      from_history = GarmentWear.where(user:, worn_on: RECENTLY_WORN_WINDOW.ago.to_date..).pluck(:garment_id)
+      from_outfits = OutfitRecommendation.joins(:week_plan).where(week_plans: { user_id: user.id })
+                                         .where(worn_at: RECENTLY_WORN_WINDOW.ago..)
+                                         .pluck(*SLOTS.map { :"#{_1}_id" }).flatten
+      (from_history + from_outfits).compact.to_set
     end
   end
 end

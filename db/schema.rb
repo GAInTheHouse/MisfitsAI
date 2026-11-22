@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_213000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -76,6 +76,21 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
     t.index ["user_id"], name: "index_body_measurements_on_user_id", unique: true
   end
 
+  create_table "calendar_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "week_event_id", null: false
+    t.string "summary"
+    t.string "event_type", default: "casual", null: false
+    t.datetime "starts_at"
+    t.datetime "ends_at"
+    t.boolean "all_day", default: false, null: false
+    t.string "location"
+    t.integer "position", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["week_event_id", "position"], name: "index_calendar_events_on_week_event_id_and_position"
+    t.index ["week_event_id"], name: "index_calendar_events_on_week_event_id"
+  end
+
   create_table "garment_drafts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "intake_batch_id", null: false
     t.uuid "user_id", null: false
@@ -88,6 +103,22 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
     t.datetime "updated_at", null: false
     t.index ["intake_batch_id"], name: "index_garment_drafts_on_intake_batch_id"
     t.index ["user_id"], name: "index_garment_drafts_on_user_id"
+  end
+
+  create_table "garment_wears", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "user_id", null: false
+    t.uuid "garment_id", null: false
+    t.uuid "outfit_recommendation_id"
+    t.date "worn_on", null: false
+    t.string "source", default: "outfit_confirm", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["garment_id", "worn_on"], name: "index_garment_wears_on_garment_id_and_worn_on"
+    t.index ["garment_id"], name: "index_garment_wears_on_garment_id"
+    t.index ["outfit_recommendation_id", "garment_id"], name: "index_garment_wears_on_outfit_and_garment", unique: true, where: "(outfit_recommendation_id IS NOT NULL)"
+    t.index ["outfit_recommendation_id"], name: "index_garment_wears_on_outfit_recommendation_id"
+    t.index ["user_id", "worn_on"], name: "index_garment_wears_on_user_id_and_worn_on"
+    t.index ["user_id"], name: "index_garment_wears_on_user_id"
   end
 
   create_table "garments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -113,7 +144,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
     t.boolean "hidden_from_recommendations", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "laundry_status", default: "clean", null: false
+    t.integer "wears_since_wash", default: 0, null: false
+    t.integer "wash_threshold"
+    t.integer "wear_count", default: 0, null: false
+    t.datetime "last_worn_at"
+    t.datetime "last_washed_at"
     t.index ["user_id", "category"], name: "index_garments_on_user_id_and_category"
+    t.index ["user_id", "laundry_status"], name: "index_garments_on_user_id_and_laundry_status"
     t.index ["user_id"], name: "index_garments_on_user_id"
   end
 
@@ -146,12 +184,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
     t.string "preview_cache_key"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "segment_index", default: 0, null: false
+    t.datetime "starts_at"
+    t.datetime "ends_at"
+    t.string "segment_label"
+    t.text "change_reason"
+    t.datetime "worn_at"
     t.index ["bottom_id"], name: "index_outfit_recommendations_on_bottom_id"
     t.index ["dress_id"], name: "index_outfit_recommendations_on_dress_id"
     t.index ["outerwear_id"], name: "index_outfit_recommendations_on_outerwear_id"
     t.index ["shoes_id"], name: "index_outfit_recommendations_on_shoes_id"
     t.index ["top_id"], name: "index_outfit_recommendations_on_top_id"
-    t.index ["week_plan_id", "date"], name: "index_outfit_recommendations_on_week_plan_id_and_date", unique: true
+    t.index ["week_plan_id", "date", "segment_index"], name: "index_outfit_recommendations_on_plan_date_segment", unique: true
     t.index ["week_plan_id"], name: "index_outfit_recommendations_on_week_plan_id"
   end
 
@@ -409,8 +453,12 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_21_230001) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "ai_calls", "users"
   add_foreign_key "body_measurements", "users"
+  add_foreign_key "calendar_events", "week_events", on_delete: :cascade
   add_foreign_key "garment_drafts", "intake_batches"
   add_foreign_key "garment_drafts", "users"
+  add_foreign_key "garment_wears", "garments"
+  add_foreign_key "garment_wears", "outfit_recommendations"
+  add_foreign_key "garment_wears", "users"
   add_foreign_key "garments", "users"
   add_foreign_key "intake_batches", "users"
   add_foreign_key "outfit_recommendations", "garments", column: "bottom_id", on_delete: :nullify

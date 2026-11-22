@@ -7,11 +7,12 @@ class WeekEventsController < ApplicationController
   def update
     if @event.update(event_type: event_params[:event_type])
       @event.week_plan.update!(source: "manual")
+      @event.calendar_events.delete_all # a manual pick replaces the synced events for that day (issue #8)
       @event_options = ::Options.fetch(:event_types).map { |e| [ e[:key], e[:label] ] }
       respond_to do |format|
         format.turbo_stream do
           render turbo_stream: turbo_stream.replace(
-            dom_id(@event),
+            helpers.dom_id(@event),
             partial: "week_plans/day_row",
             locals: { event: @event, event_options: @event_options }
           )
