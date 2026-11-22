@@ -30,3 +30,9 @@ Feature: Avatar generation
     When I upload "selfie.jpg" as my avatar selfie
     And background jobs finish
     Then I should see "Avatar generation failed"
+
+  @javascript
+  Scenario: Profile avatar frame loads without Turbo missing content
+    Given I visit "/profile"
+    Then I should see "Upload a selfie"
+    And I should not see "Content missing"

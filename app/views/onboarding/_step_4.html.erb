@@ -1,19 +1,32 @@
-<h1 class="text-2xl font-semibold mb-2">Your first week of outfits</h1>
-<p class="text-[var(--muted)] mb-6">We're putting together 7 looks for you. Explanations stream in as they're ready.</p>
+<h1 class="text-2xl font-semibold mb-2">Add a photo</h1>
+<p class="text-[var(--muted)] mb-6">Upload a selfie so we can show outfits on you. You can add one later from Profile.</p>
 
-<%= turbo_stream_from current_user, :planner %>
-<%= turbo_stream_from current_user, :wardrobe %>
-
-<% if week_plan %>
-  <div class="space-y-3 mb-8">
-    <% week_plan.outfit_recommendations.order(:date).each do |rec| %>
-      <%= render "outfits/day_card", rec: %>
-    <% end %>
-  </div>
-<% else %>
-  <div class="text-[var(--muted)] text-sm mb-8">Setting up your outfits…</div>
+<% if flash[:alert].present? %>
+  <p class="text-red-600 text-sm mb-4"><%= flash[:alert] %></p>
 <% end %>
 
-<%= form_with url: onboarding_path, method: :patch, class: "flex justify-end" do %>
-  <button type="submit" class="btn-primary px-6 py-2">Enter My Wardrobe</button>
+<% if Feature.enabled?(:avatar) %>
+  <%= turbo_stream_from current_user, :avatar %>
+  <div class="mb-8">
+    <%= render "avatars/avatar_section", profile: profile %>
+  </div>
+<% end %>
+
+<%= form_with url: onboarding_path, method: :patch, multipart: true, class: "w-full" do %>
+  <% if Feature.enabled?(:avatar) %>
+    <label for="onboarding_selfie_input" class="block text-sm font-medium text-[var(--muted)] mb-2">
+      Choose a selfie to continue with upload
+    </label>
+    <input type="file" id="onboarding_selfie_input" name="selfie" accept="image/*" class="file-input mb-6" />
+  <% end %>
+
+  <div class="flex justify-between pt-4 gap-3 flex-wrap">
+    <%= link_to "← Back", back_onboarding_path,
+          data: { turbo_method: :post },
+          class: "btn-ghost px-4 py-2" %>
+    <div class="flex gap-2">
+      <button type="submit" name="skip" value="1" class="btn-ghost px-4 py-2">Skip for now</button>
+      <button type="submit" class="btn-primary px-6 py-2">Continue</button>
+    </div>
+  </div>
 <% end %>

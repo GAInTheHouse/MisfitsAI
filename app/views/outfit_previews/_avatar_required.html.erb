@@ -1,0 +1,11 @@
+<%# locals: (profile:) %>
+<div class="text-center py-4 space-y-3 max-w-sm">
+  <p class="text-sm" style="color: var(--muted);">
+    Upload a selfie on
+    <%= link_to "Profile", profile_path(anchor: "profile_avatar"), class: "underline font-medium", style: "color: var(--ink);" %>
+    to generate looks on you.
+  </p>
+  <% if profile.avatar_status == "failed" && profile.avatar_error.present? %>
+    <p class="text-red-600 text-xs"><%= profile.avatar_error %></p>
+  <% end %>
+</div>

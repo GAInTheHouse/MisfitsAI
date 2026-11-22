@@ -14,11 +14,11 @@ FactoryBot.define do
 
     trait :onboarded do
       onboarding_completed_at { Time.current }
-      onboarding_step { 4 }
+      onboarding_step { 5 }
     end
 
-    trait :onboarded_step_4 do
-      onboarding_step { 4 }
+    trait :onboarded_step_5 do
+      onboarding_step { 5 }
       onboarding_completed_at { nil }
     end
 

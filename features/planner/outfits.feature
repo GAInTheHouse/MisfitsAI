@@ -59,7 +59,7 @@ Feature: Weekly outfit recommendations
   Scenario: The On Me slot appears when its flag is on
     Given the "outfit_preview" feature is enabled
     When I generate outfits for my week
-    Then I should see "Generate look"
+    Then I should see "Upload a selfie on"
 
   Scenario: Hide an item from an outfit removes it from recommendations
     When I generate outfits for my week

@@ -1,0 +1,4 @@
+<%# locals: (rec:) %>
+<%= turbo_frame_tag dom_id(rec, :on_me) do %>
+  <%= render "outfit_previews/preview", rec: rec %>
+<% end %>
