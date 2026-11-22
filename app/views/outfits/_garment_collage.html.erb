@@ -1,0 +1,21 @@
+<%# locals: (rec:, modal_id:) %>
+<div class="flex flex-wrap gap-2">
+  <% rec.garments_in_display_order.each do |g| %>
+    <div class="group relative">
+      <button data-action="click->shared--modal#open"
+              title="<%= g.name %>"
+              class="w-16 h-16 rounded-xl border overflow-hidden block hover:opacity-80 transition-opacity"
+              style="border-color: var(--line);">
+        <%= render "garments/thumb", garment: g %>
+      </button>
+      <%= button_to "Hide",
+            hide_garment_path(g),
+            method: :patch,
+            params: { hidden: true },
+            class: "absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-5 h-5 rounded-full text-xs",
+            style: "background: var(--panel-strong); color: var(--muted); border: 1px solid var(--line);",
+            title: "Hide from outfit",
+            data: { turbo: false } %>
+    </div>
+  <% end %>
+</div>
