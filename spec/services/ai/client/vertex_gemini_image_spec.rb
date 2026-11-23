@@ -89,13 +89,13 @@ RSpec.describe Ai::Client::Vertex, "Gemini garment images" do
       end
     end
 
-    it "leaves other image kinds (Phase 4 avatar) on IMAGEN_MODEL" do
-      with_env("IMAGEN_MODEL" => "imagen-4.0-fast-generate-001") do
-        stub_request(:post, %r{/models/imagen-4\.0-fast-generate-001:predict})
-          .to_return(status: 200, body: JSON.generate(predictions: [ { bytesBase64Encoded: Base64.strict_encode64(png) } ]))
-        client.generate_image(kind: :avatar_portrait, prompt: "portrait")
-        expect(a_request(:post, /generateContent/)).not_to have_been_made
-      end
+    it "generates avatar portraits through the Gemini image model, not discontinued Imagen" do
+      stub_request(:post, gemini).to_return(status: 200, body: reply([ image_part(png) ]))
+      client.generate_image(kind: :avatar_portrait, prompt: "portrait", aspect_ratio: "1:1")
+      expect(a_request(:post, gemini_url).with { |req|
+        JSON.parse(req.body).dig("generationConfig", "imageConfig", "aspectRatio") == "1:1"
+      }).to have_been_made.once
+      expect(a_request(:post, /:predict/)).not_to have_been_made
     end
   end
 

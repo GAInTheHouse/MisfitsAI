@@ -4,9 +4,10 @@ module Ai
   class Client
     # Vertex AI (Gemini, Imagen) and Discovery Engine over REST.
     #
-    # Garment product images (kind :garment_image) use GARMENT_IMAGE_MODEL, default gemini-2.5-flash-image, through
-    # Gemini generateContent: Google discontinued the Imagen GA endpoints (see docs/handoff/phase-2.md). An imagen-*
-    # value still uses the Imagen :predict request below, unchanged. Other image kinds keep IMAGEN_MODEL.
+    # Garment images (:garment_image) and avatar portraits (:avatar_portrait) use Gemini generateContent
+    # (GARMENT_IMAGE_MODEL and AVATAR_IMAGE_MODEL, both defaulting to gemini-2.5-flash-image). Google discontinued
+    # the Imagen GA endpoints, so IMAGEN_MODEL returns 404 for those portraits. An imagen-* value still uses the
+    # Imagen :predict request below, unchanged. Other image kinds keep IMAGEN_MODEL.
     #
     # Errors (design doc 3.7, extended in Phase 2; see docs/handoff/phase-2.md):
     #   400 -> InvalidRequestError, or ContentBlockedError when Google's structured ErrorInfo names a safety reason
@@ -284,7 +285,13 @@ module Ai
         false
       end
 
-      def image_model_for(kind) = kind.to_s == "garment_image" ? garment_image_model : imagen_model
+      def image_model_for(kind)
+        case kind.to_s
+        when "garment_image" then garment_image_model
+        when "avatar_portrait" then avatar_image_model
+        else imagen_model
+        end
+      end
       def gemini_model?(model) = model.to_s.start_with?("gemini-")
 
       def gemini_body(prompt:, system: nil, images: [], temperature: 0.2, max_output_tokens: 2048,
@@ -439,6 +446,7 @@ module Ai
       def grounded_model = ENV.fetch("GROUNDED_MODEL", "gemini-2.5-flash")
       def imagen_model = ENV.fetch("IMAGEN_MODEL", "imagen-4.0-fast-generate-001")
       def garment_image_model = ENV.fetch("GARMENT_IMAGE_MODEL", "gemini-2.5-flash-image")
+      def avatar_image_model = ENV.fetch("AVATAR_IMAGE_MODEL", "gemini-2.5-flash-image")
       def outfit_subject_model = ENV.fetch("OUTFIT_SUBJECT_MODEL", "imagen-3.0-capability-001")
       def outfit_gemini_model = ENV.fetch("OUTFIT_GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
       def ranking_model = ENV.fetch("RANKING_MODEL", "semantic-ranker-default@latest")
