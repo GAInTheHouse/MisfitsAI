@@ -1,8 +1,9 @@
 Feature: Authorization
   As a signed-in user
-  I should only access my own records
+  I want my closet and plans to stay private
+  So that other accounts cannot change my clothes or outfits
 
-  Scenario: Another user's garment returns 404 for edit, hide, and delete
+  Scenario: I cannot edit, hide, or delete someone else's clothes
     Given another user owns a garment
     When I try to edit the other user's garment
     Then I should get a not found response
@@ -11,7 +12,7 @@ Feature: Authorization
     When I try to delete the other user's garment
     Then I should get a not found response
 
-  Scenario: Another user's outfit and week events return 404
+  Scenario: I cannot open or change someone else's outfit or week plan
     Given another user has a planned week with an outfit
     When I try to view the other user's outfit
     Then I should get a not found response

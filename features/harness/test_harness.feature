@@ -1,3 +1,4 @@
+@harness
 Feature: Phase 2 test harness
   As a developer
   I want the Cucumber harness itself to be checked
