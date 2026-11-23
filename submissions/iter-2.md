@@ -19,12 +19,12 @@ Personal wardrobe planner SaaS: digitize a closet, sync the week from Google Cal
 | **Health check** | https://misfits-ai-demo-5e25da632c7b.herokuapp.com/up |
 | **GitHub** | https://github.com/GAInTheHouse/MisfitsAI |
 | **CI (tests + merged coverage)** | https://github.com/GAInTheHouse/MisfitsAI/actions/workflows/ci.yml |
-| **Photo intake follow-up (MVP feedback)** | https://github.com/GAInTheHouse/MisfitsAI/issues/64 |
+| **Photo intake flatlay** | https://github.com/GAInTheHouse/MisfitsAI/pull/66 |
 
 ## Product summary (main features)
 
 1. **Account** — Email/password and Google sign-in; per-user data; time zone drives the week and weather location.
-2. **Wardrobe** — Manual add, image search, photo AI, receipts, onboarding starter catalog; filter, hide, delete, retry images.
+2. **Wardrobe** — Manual add, image search, photo AI (a flatlay generated from the uploaded photo), receipts, onboarding starter catalog; filter, hide, delete, retry images.
 3. **Laundry & wear history** — Confirming an outfit records wears; garments enter laundry at their wash threshold and stay out of recommendations until washed.
 4. **Week plan** — Seven-day view, demo week, manual event types, **Google Calendar sync** with reconnect when OAuth expires.
 5. **Outfits** — Rule-based recommendations per event type; Mon–Sun UI; streamed LLM explanations with template fallback; hide/regenerate; missing-slot banners.
@@ -45,7 +45,8 @@ Stack: Ruby 3.3.14, Rails 8, Hotwire, PostgreSQL, Solid Queue, Vertex AI (fake a
 - Planner bug fixes (week boundary, calendar completion, outfit scope, explanations)
 - Weekly outfits UI (tabs, collage, hide, missing-slot banner)
 - Avatar via Gemini; On Me and stepper polish; profile swatch UX
-- Iteration 2 submission work: product-focused Cucumber, merged SimpleCov in CI, [issue #64](https://github.com/GAInTheHouse/MisfitsAI/issues/64) for photo flatlay
+- Photo AI builds each draft image from the uploaded photo (image-conditioned flatlay, [#66](https://github.com/GAInTheHouse/MisfitsAI/pull/66)); the raw upload is removed after those images finish
+- Iteration 2 submission work: product-focused Cucumber and merged SimpleCov in CI
 
 ---
 
@@ -106,7 +107,7 @@ On GitHub Actions, open the latest green **CI** run → **coverage** job → dow
 4. **Week plan** — Load the demo week and **Generate outfits**.
 5. **Outfits** — Check Mon–Sun cards and explanations.
 6. **Today** — Confirm **I wore this**; open wear history and laundry when thresholds hit.
-7. Optional: Calendar sync, photo AI (still text-regenerated images until [#64](https://github.com/GAInTheHouse/MisfitsAI/issues/64)), avatar / On Me.
+7. Optional: Calendar sync, photo AI (flatlay from your photo), avatar / On Me.
 
 ---
 
@@ -129,5 +130,4 @@ Heroku: https://misfits-ai-demo-5e25da632c7b.herokuapp.com/
 GitHub: https://github.com/GAInTheHouse/MisfitsAI
 Tests: 124 Cucumber user scenarios + RSpec; merged SimpleCov in CI (coverage-report artifact). Run locally with AI_ADAPTER=fake.
 Submission README: submissions/iter-2.md
-Photo AI follow-up: https://github.com/GAInTheHouse/MisfitsAI/issues/64
 ```
