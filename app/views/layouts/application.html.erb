@@ -40,7 +40,7 @@
             </div>
           </div>
         </header>
-        <%= render "shared/stepper" %>
+        <%= render "shared/stepper" if show_setup_stepper? %>
       <% else %>
         <header class="px-4 py-6 text-center">
           <p class="font-display text-3xl">misfitAI</p>

@@ -4,7 +4,8 @@ Feature: Navigation stepper
   So that I know what steps remain
 
   Background:
-    Given I am signed in as an onboarded user
+    Given the "onboarding" feature is enabled
+    And I am signed in as a new user
 
   Scenario: Wardrobe step shows a check mark when it has a top and a bottom
     Given my wardrobe contains:
@@ -22,6 +23,11 @@ Feature: Navigation stepper
   Scenario: Profile step is always shown as complete
     When I visit "/wardrobe"
     Then the "Profile" stepper step should be complete
+
+  Scenario: Stepper is hidden after onboarding is complete
+    Given I am signed in as an onboarded user
+    When I visit "/wardrobe"
+    Then the setup stepper should not be visible
 
   @mobile @javascript
   Scenario: Mobile tab bar is visible on narrow screens
