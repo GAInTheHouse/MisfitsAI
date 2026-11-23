@@ -50,6 +50,14 @@ Then("the uploaded photo should not be kept") do
   expect(ActiveStorage::Attachment.where(record_type: "IntakeBatch")).to be_empty
 end
 
+Then("the draft images should not be the raw uploaded photo") do
+  batch = IntakeBatch.where(user: @user).order(:created_at).last
+  upload_bytes = File.binread(Rails.root.join("spec/fixtures/files/outfit.jpg"))
+  attached = batch.garment_drafts.filter_map { |draft| draft.image.download if draft.image.attached? }
+  expect(attached).not_to be_empty
+  expect(attached).not_to include(upload_bytes)
+end
+
 Then("no AI analysis should have been requested") do
   expect(Ai::Client::Fake.calls.select { _1[:kind] == "garment_extraction" }).to be_empty
 end

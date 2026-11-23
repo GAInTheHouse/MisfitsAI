@@ -141,12 +141,14 @@ module Ai
         end
       end
 
-      def generate_image_multimodal(kind:, prompt:, images:, user: nil)
+      def generate_image_multimodal(kind:, prompt:, images:, aspect_ratio: nil, user: nil)
+        model = kind.to_s == "garment_image" ? garment_image_model : outfit_gemini_model
         body = gemini_body(prompt: prompt, images: images, temperature: 0.4, max_output_tokens: 2048,
-                           response_modalities: %w[TEXT IMAGE])
-        post_gemini(kind: kind, model: outfit_gemini_model, body: body, user: user, images_in: images.size,
+                           response_modalities: %w[TEXT IMAGE], aspect_ratio: aspect_ratio)
+        post_gemini(kind: kind, model: model, body: body, user: user, images_in: images.size,
                     images_out: 1) do |json|
-          decode_gemini_image(json)
+          image = decode_gemini_image(json)
+          kind.to_s == "garment_image" ? validated_garment_image(image) : image
         end
       end
 
@@ -295,7 +297,7 @@ module Ai
       def gemini_model?(model) = model.to_s.start_with?("gemini-")
 
       def gemini_body(prompt:, system: nil, images: [], temperature: 0.2, max_output_tokens: 2048,
-                      json_schema: nil, response_modalities: nil)
+                      json_schema: nil, response_modalities: nil, aspect_ratio: nil)
         parts = [ { text: prompt } ]
         images.each do |img|
           parts << { inlineData: { mimeType: img.mime_type, data: Base64.strict_encode64(img.bytes) } }
@@ -310,6 +312,7 @@ module Ai
           gen[:responseSchema] = json_schema
         end
         gen[:responseModalities] = response_modalities if response_modalities
+        gen[:imageConfig] = { aspectRatio: aspect_ratio } if aspect_ratio.present?
         {
           systemInstruction: system ? { parts: [ { text: system } ] } : nil,
           contents: [ { role: "user", parts: parts } ],

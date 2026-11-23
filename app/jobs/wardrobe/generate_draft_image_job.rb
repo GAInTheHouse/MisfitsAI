@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
 module Wardrobe
-  # Photo intake, step 2 (design doc 6.6): a product image for one draft. A failed image leaves the draft
-  # ready without an image, so it can still be committed with the category placeholder.
-  # If the draft is committed before its image is done, the image goes to the garment it became (the one in
-  # attrs["garment_id"], while that garment still waits for an image), so the AI call is not wasted.
+  # Photo intake, step 2 (design doc 6.6): a product image for one draft from the uploaded photo (multimodal
+  # flatlay). A failed image leaves the draft ready without an image, so it can still be committed with the
+  # category placeholder. If the draft is committed before its image is done, the image goes to the garment it
+  # became (the one in attrs["garment_id"], while that garment still waits for an image), so the AI call is
+  # not wasted. The batch source photo is purged once every draft has left pending.
   class GenerateDraftImageJob < ApplicationJob
     queue_as :ai_images
 
@@ -24,13 +25,27 @@ module Wardrobe
 
     def perform(draft_id)
       @draft = GarmentDraft.find(draft_id)
-      return unless @draft.pending? || waiting_garment # nothing needs this image: no AI call
+      unless @draft.pending? || waiting_garment
+        purge_source_batch_if_done
+        return
+      end
 
-      image = Ai::Client.current.generate_image(
-        kind: :garment_image, prompt: PhotoIntake::Prompts.product_image(@draft.attrs), user: @draft.user
+      reference = PhotoIntake::ReferenceImage.call(@draft)
+      unless reference
+        finish(error: IMAGE_UNAVAILABLE)
+        return
+      end
+
+      image = Ai::Client.current.generate_image_multimodal(
+        kind: :garment_image,
+        prompt: PhotoIntake::Prompts.reference_flatlay(@draft.attrs),
+        images: [ reference ],
+        aspect_ratio: "1:1",
+        user: @draft.user
       )
       jpeg = Media::ImageNormalizer.to_square_jpeg(image.bytes, size: ENV.fetch("GARMENT_ASSET_SIZE", 512).to_i)
       garment = attach(jpeg)
+      purge_source_batch_if_done
       garment ? Wardrobe::GarmentBroadcasts.image_changed(garment) : finish
     end
 
@@ -72,6 +87,19 @@ module Wardrobe
       batch = draft.intake_batch
       update_progress(batch)
       broadcast(draft, batch)
+      purge_source_batch_if_done
+    end
+
+    def purge_source_batch_if_done
+      batch = (@draft || GarmentDraft.find_by(id: arguments.first))&.intake_batch
+      return unless batch&.source_file&.attached?
+
+      batch.with_lock do
+        next unless batch.source_file.attached?
+        next if batch.garment_drafts.exists?(status: "pending")
+
+        batch.source_file.purge_later
+      end
     end
 
     def update_progress(batch)

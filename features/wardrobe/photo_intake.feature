@@ -90,13 +90,14 @@ Feature: Add garments from an outfit photo
     Then I should see 0 draft garments
     And my wardrobe should be empty
 
-  Scenario: The uploaded photo is not kept after analysis
+  Scenario: The uploaded photo is not kept after flatlay images finish
     Given the AI will detect these garments in my photo:
       | item_type        | category | color | formality | seasonality |
       | crewneck sweater | top      | cream | casual    | cold        |
     When I upload "outfit.jpg" on the Photo AI tab
     And background jobs finish
     Then the uploaded photo should not be kept
+    And the draft images should not be the raw uploaded photo
 
   Scenario: A photo over 15 MB is rejected
     When I upload a 16 MB photo on the Photo AI tab

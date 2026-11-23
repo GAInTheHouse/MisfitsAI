@@ -34,6 +34,20 @@ RSpec.describe Wardrobe::PhotoIntake::Mapper do
     expect(map(item("brand" => "Levi's")).first["brand"]).to eq("Levi's")
   end
 
+  it "stores a valid box_2d as box on the draft attrs" do
+    attrs = map(item("box_2d" => [ 0.1, 0.2, 0.9, 0.8 ])).first
+    expect(attrs["box"]).to eq([ 0.1, 0.2, 0.9, 0.8 ])
+  end
+
+  it "scales box_2d values in 0..1000" do
+    attrs = map(item("box_2d" => [ 100, 200, 900, 800 ])).first
+    expect(attrs["box"]).to eq([ 0.1, 0.2, 0.9, 0.8 ])
+  end
+
+  it "drops an invalid box_2d" do
+    expect(map(item("box_2d" => [ 0, 0, 0, 0 ])).first).not_to have_key("box")
+  end
+
   it "sets invalid formality and seasonality to nil" do
     expect(map(item("formality" => "fancy", "seasonality" => "monsoon")).first.values_at("formality", "seasonality"))
       .to eq([ nil, nil ])
