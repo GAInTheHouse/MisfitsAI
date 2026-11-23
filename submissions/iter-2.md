@@ -21,26 +21,6 @@ Personal wardrobe planner SaaS: digitize a closet, sync the week from Google Cal
 | **CI (tests + merged coverage)** | https://github.com/GAInTheHouse/MisfitsAI/actions/workflows/ci.yml |
 | **Photo intake follow-up (MVP feedback)** | https://github.com/GAInTheHouse/MisfitsAI/issues/64 |
 
-## Response to iteration 1 feedback
-
-**User stories.** Cucumber now describes product journeys (sign up, build a closet, plan the week, wear and wash). Specs that belonged in RSpec moved there: Google token encryption (`spec/requests/users/google_token_encryption_spec.rb`), login throttling (`spec/requests/login_rate_limits_spec.rb`), and internal metrics (`spec/requests/api/metrics_spec.rb`, `spec/requests/admin/metrics_spec.rb`). The Cucumber harness (`features/harness/test_harness.feature`, tag `@harness`) checks the test sandbox only and is not counted as a user story.
-
-**MVP / photo AI.** Photo intake still analyzes the upload, then builds a studio image from a text prompt (the generic “uncanny valley” path). We agree the garment should stay tied to the photograph. The planned fix is an **image-conditioned flatlay** via `generate_image_multimodal`, tracked in [issue #64](https://github.com/GAInTheHouse/MisfitsAI/issues/64) (not shipped in this submission). Search import already keeps a real product photo; manual add can skip image generation.
-
-**Testing.** SimpleCov now uses the **Rails** profile across the whole `app/` tree. CI runs coverage for **RSpec and Cucumber**, then collates both result sets in the `coverage` job and publishes a merged HTML report (`coverage-report` artifact). Run locally:
-
-```bash
-COVERAGE=true AI_ADAPTER=fake bundle exec rspec
-COVERAGE=true AI_ADAPTER=fake bundle exec cucumber
-bundle exec ruby script/collate_coverage.rb coverage/.resultset.json coverage/.resultset.json
-```
-
-After separate RSpec and Cucumber runs, pass both `coverage/.resultset.json` paths (copy one aside before the second run) or use the **coverage** job’s **coverage-report** artifact on GitHub Actions.
-
-**Deployment.** Unchanged: Heroku demo above; lint and security checks run on every push to `main`.
-
----
-
 ## Product summary (main features)
 
 1. **Account** — Email/password and Google sign-in; per-user data; time zone drives the week and weather location.
