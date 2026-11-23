@@ -9,7 +9,8 @@ class OutfitsController < ApplicationController
                      .includes(:top, :bottom, :dress, :outerwear, :shoes)
                      .in_day_order
     @recs_by_day     = recs.group_by { |r| (r.date - @week_plan.week_start).to_i }
-    today_offset     = (Date.current - @week_plan.week_start).to_i.clamp(0, 6)
+    today            = Time.current.in_time_zone(current_user.time_zone).to_date
+    today_offset     = (today - @week_plan.week_start).to_i.clamp(0, 6)
     @selected_day    = params[:day]&.to_i&.clamp(0, 6) || today_offset
     @avatar_ready    = current_user.profile.avatar_status == "ready" &&
                        current_user.profile.avatar.attached?

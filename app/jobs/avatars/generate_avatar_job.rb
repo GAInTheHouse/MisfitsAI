@@ -4,13 +4,22 @@ module Avatars
   class GenerateAvatarJob < ApplicationJob
     queue_as :ai_images
 
-    rescue_from(StandardError) do |_e|
+    rescue_from(StandardError) do |error|
+      Rails.logger.error("[Avatars::GenerateAvatarJob] #{error.class}: #{error.message}")
       profile = UserProfile.find_by(id: arguments.first)
-      profile&.update!(avatar_status: "failed", avatar_error: "Avatar generation failed. Please try another photo.")
+      if profile && profile.avatar_status != "ready"
+        profile.update!(avatar_status: "failed", avatar_error: "Avatar generation failed. Please try another photo.")
+        broadcast_avatar(profile)
+      end
     end
 
     def perform(profile_id)
       profile = UserProfile.find(profile_id)
+      if profile.avatar_status == "ready" && profile.avatar.attached?
+        broadcast_avatar(profile)
+        return
+      end
+
       user = profile.user
       context = Profiles.for(user)
 
@@ -37,15 +46,41 @@ module Avatars
 
       profile.avatar.attach(io: StringIO.new(jpeg), filename: "avatar.jpg", content_type: "image/jpeg")
       profile.update!(avatar_status: "ready", avatar_error: nil)
+      broadcast_avatar(profile)
+    ensure
+      purge_selfie(profile)
+    end
 
+    private
+
+    def broadcast_avatar(profile)
+      user = profile.user
       Turbo::StreamsChannel.broadcast_replace_to(
         [ user, :avatar ],
         target: "avatar_section",
         partial: "avatars/avatar_section",
         locals: { profile: profile }
       )
-    ensure
-      profile&.pending_selfie&.purge if profile&.pending_selfie&.attached?
+
+      plan = user.week_plans.order(created_at: :desc).first
+      return unless plan
+
+      plan.outfit_recommendations.includes(:week_plan, :top, :bottom, :dress, :outerwear, :shoes).find_each do |rec|
+        Turbo::StreamsChannel.broadcast_replace_to(
+          [ user, :planner ],
+          target: ActionView::RecordIdentifier.dom_id(rec),
+          partial: "outfits/day_card",
+          locals: { rec: rec }
+        )
+      end
+    end
+
+    def purge_selfie(profile)
+      return unless profile&.pending_selfie&.attached?
+
+      profile.pending_selfie.purge
+    rescue StandardError => e
+      Rails.logger.warn("[Avatars::GenerateAvatarJob] selfie purge failed: #{e.class}")
     end
   end
 end
