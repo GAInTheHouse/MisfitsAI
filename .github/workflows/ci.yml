@@ -58,6 +58,7 @@ jobs:
         with:
           name: coverage-rspec
           path: coverage/.resultset.json
+          include-hidden-files: true
 
   cucumber:
     runs-on: ubuntu-latest
@@ -117,6 +118,7 @@ jobs:
         with:
           name: coverage-cucumber
           path: coverage/.resultset.json
+          include-hidden-files: true
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
