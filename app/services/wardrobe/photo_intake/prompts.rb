@@ -39,7 +39,10 @@ module Wardrobe
             seasonality:  { type: "STRING", enum: %w[hot mild cold all_season] },
             brand:        { type: "STRING", nullable: true },
             confidence:   { type: "NUMBER", nullable: true,
-                            description: "How sure you are about this item, from 0 to 1." }
+                            description: "How sure you are about this item, from 0 to 1." },
+            box_2d:       { type: "ARRAY", nullable: true,
+                            description: "Normalized bounding box [y_min, x_min, y_max, x_max] in 0..1 or 0..1000.",
+                            items: { type: "NUMBER" } }
           }, required: %w[item_type color category formality seasonality] } }
         },
         required: %w[items]
@@ -50,11 +53,28 @@ module Wardrobe
       # Draft product image (design doc 6.6, exact): bracketed parts are left out when blank.
       def product_image(attrs)
         attrs = attrs.to_h.stringify_keys
-        subject = [ attrs["color_primary"], attrs["pattern"], attrs["material"], attrs["item_type"].presence || attrs["name"],
-                    attrs["fit_style"] ].compact_blank.join(" ")
+        subject = garment_subject(attrs)
         "product photo of a #{subject}, isolated on a pure white background, studio lighting, flat lay, " \
           "high resolution, fashion photography"
       end
+
+      # Image-conditioned flatlay for photo-intake drafts (reference photo in the multimodal request).
+      def reference_flatlay(attrs)
+        attrs = attrs.to_h.stringify_keys
+        subject = garment_subject(attrs)
+        "Using the reference photo, produce a clean flat-lay product image of only the #{subject}. " \
+          "Match the garment's silhouette, color, pattern, and visible construction details. " \
+          "Remove the person, background, and any other items. " \
+          "Plain pure white background, studio lighting, high-resolution fashion product photography, " \
+          "no model, no hands."
+      end
+
+      def garment_subject(attrs)
+        attrs = attrs.to_h.stringify_keys
+        [ attrs["color_primary"], attrs["pattern"], attrs["material"], attrs["item_type"].presence || attrs["name"],
+          attrs["fit_style"] ].compact_blank.join(" ")
+      end
+      private :garment_subject
     end
   end
 end

@@ -15,6 +15,14 @@ RSpec.describe Wardrobe::PhotoIntake::Prompts do
     expect(item.dig(:properties, :confidence, :nullable)).to be(true)
   end
 
+  describe ".reference_flatlay" do
+    it "names the garment and asks for a photo-conditioned flat lay" do
+      attrs = { "color_primary" => "blue", "item_type" => "straight jeans" }
+      prompt = described_class.reference_flatlay(attrs)
+      expect(prompt).to include("reference photo", "straight jeans", "blue", "white background")
+    end
+  end
+
   describe ".product_image (design doc 6.6, exact)" do
     it "includes every part when present" do
       attrs = { "color_primary" => "cream", "pattern" => "cable-knit", "material" => "wool", "item_type" => "crewneck sweater",

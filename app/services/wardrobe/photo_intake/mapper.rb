@@ -31,6 +31,8 @@ module Wardrobe
         category_guessed = !Garment::CATEGORIES.include?(category)
         confidence = confidence_from(item["confidence"])
 
+        box = box_from(item["box_2d"])
+
         {
           "name" => item_type.titleize.first(Garment::NAME_MAX_LENGTH).strip,
           "item_type" => item_type.downcase,
@@ -45,8 +47,23 @@ module Wardrobe
           "seasonality" => item["seasonality"].to_s.presence_in(Garment::SEASONALITIES),
           "brand" => item["brand"].to_s.strip.presence,
           "confidence" => confidence,
-          "needs_confirmation" => category_guessed || (confidence && confidence < LOW_CONFIDENCE) || false
+          "needs_confirmation" => category_guessed || (confidence && confidence < LOW_CONFIDENCE) || false,
+          **(box ? { "box" => box } : {})
         }
+      end
+
+      def box_from(raw)
+        return nil unless raw.is_a?(Array) && raw.size == 4
+        return nil unless raw.all? { |v| v.is_a?(Numeric) || v.to_s.match?(/\A-?\d+(\.\d+)?\z/) }
+
+        values = raw.map { |v| v.to_f }
+        values = values.map { |v| v / 1000.0 } if values.any? { |v| v > 1.0 } && values.all? { |v| v.between?(0.0, 1000.0) }
+        return nil unless values.all? { |v| v.between?(0.0, 1.0) }
+
+        y_min, x_min, y_max, x_max = values
+        return nil if y_max <= y_min || x_max <= x_min
+
+        values
       end
 
       def pattern_from(value)

@@ -66,7 +66,7 @@ module Ai
         stubbed_image(kind)
       end
 
-      def generate_image_multimodal(kind:, prompt:, images:, user: nil)
+      def generate_image_multimodal(kind:, prompt:, images:, aspect_ratio: nil, user: nil)
         check_disabled!(kind)
         check_quotas!(kind, user, images.size, 1)
         record_call(:generate_image_multimodal, kind, prompt, user, images_in: images.size, images_out: 1)

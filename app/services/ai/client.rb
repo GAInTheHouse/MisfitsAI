@@ -34,7 +34,7 @@ module Ai
       raise NotImplementedError
     end
 
-    def generate_image_multimodal(kind:, prompt:, images:, user: nil)
+    def generate_image_multimodal(kind:, prompt:, images:, aspect_ratio: nil, user: nil)
       raise NotImplementedError
     end
 
