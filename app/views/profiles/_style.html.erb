@@ -28,8 +28,8 @@
             <input type="radio" name="user_profile[skin_tone]" value="<%= key %>"
               class="sr-only" <%= "checked" if profile.skin_tone == key %>
               data-action="change->shared--dirty-form#changed" />
-            <span class="block w-8 h-8 rounded-full border-2 mx-auto mb-1"
-              style="background:<%= hex %>; border-color:<%= profile.skin_tone == key ? '#000' : '#ddd' %>;"></span>
+            <span class="swatch block w-8 h-8 rounded-full border-2 mx-auto mb-1"
+              style="background:<%= hex %>;"></span>
             <%= label %>
           </label>
         <% end %>
@@ -58,8 +58,8 @@
             <input type="checkbox" name="user_profile[favorite_colors][]" value="<%= key %>"
               class="sr-only" <%= "checked" if Array(profile.favorite_colors).include?(key) %>
               data-action="change->shared--dirty-form#changed" />
-            <span class="block w-7 h-7 rounded-full border-2 mx-auto"
-              style="background:<%= hex %>; border-color:<%= Array(profile.favorite_colors).include?(key) ? '#000' : '#ddd' %>;"></span>
+            <span class="swatch block w-7 h-7 rounded-full border-2 mx-auto"
+              style="background:<%= hex %>;"></span>
           </label>
         <% end %>
       </div>
@@ -73,8 +73,8 @@
             <input type="checkbox" name="user_profile[avoided_colors][]" value="<%= key %>"
               class="sr-only" <%= "checked" if Array(profile.avoided_colors).include?(key) %>
               data-action="change->shared--dirty-form#changed" />
-            <span class="block w-7 h-7 rounded-full border-2 mx-auto"
-              style="background:<%= hex %>; border-color:<%= Array(profile.avoided_colors).include?(key) ? '#000' : '#ddd' %>;"></span>
+            <span class="swatch block w-7 h-7 rounded-full border-2 mx-auto"
+              style="background:<%= hex %>;"></span>
           </label>
         <% end %>
       </div>

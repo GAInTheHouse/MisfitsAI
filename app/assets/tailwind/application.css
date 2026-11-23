@@ -89,6 +89,22 @@
     outline-offset: 2px;
   }
 
+/* Color & skin tone swatches (state driven by :has(input:checked) so clicks highlight immediately). */
+.swatch {
+  border-color: var(--line);
+}
+
+label:has(input:checked) .swatch {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--panel-strong), 0 0 0 4px var(--accent);
+  transform: scale(1.06);
+}
+
+label:has(input:focus-visible) .swatch {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
   /* Tabs toggled by the shared--tabs Stimulus controller (it sets .active and aria-selected). */
   .tab {
     @apply inline-flex items-center rounded-full px-4 py-2 text-sm;
