@@ -1,4 +1,5 @@
 <% content_for :title, "Your Outfits" %>
+<%= turbo_stream_from current_user, :planner %>
 <% week_days = (0..6).map { |i| @week_plan.week_start + i } %>
 
 <div class="max-w-3xl mx-auto px-4 py-8">

@@ -1,4 +1,5 @@
 <% content_for :title, "Outfit – #{@outfit.date.strftime('%A, %B %-d')}" %>
+<%= turbo_stream_from current_user, :planner %>
 
 <div class="max-w-2xl mx-auto px-4 py-8">
   <%= link_to "← Back to outfits", outfits_path, class: "text-sm hover:underline mb-6 block", style: "color: var(--muted);" %>

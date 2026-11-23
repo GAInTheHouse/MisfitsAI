@@ -3,19 +3,19 @@
 FactoryBot.define do
   factory :week_plan do
     association :user
-    week_start { Date.current.beginning_of_week(:monday) }
+    week_start { Planner::Week.current_start(user) }
     source { "manual" }
   end
 
   factory :week_event do
     association :week_plan
-    date { Date.current }
+    date { Time.current.in_time_zone(week_plan.user.time_zone).to_date }
     event_type { "work_meeting" }
   end
 
   factory :outfit_recommendation do
     association :week_plan
-    date { Date.current }
+    date { Time.current.in_time_zone(week_plan.user.time_zone).to_date }
     event_type { "work_meeting" }
     explanation_status { "pending" }
     preview_status { "none" }

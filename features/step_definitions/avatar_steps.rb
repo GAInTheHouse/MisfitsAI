@@ -48,10 +48,11 @@ Then("I should not see the {string} toggle") do |label|
 end
 
 Given("I have outfit recommendations for this week") do
-  plan = @user.week_plans.create!(week_start: Date.current.beginning_of_week(:monday), source: "demo")
+  start = Planner::Week.current_start(@user)
+  plan = @user.week_plans.create!(week_start: start, source: "demo")
   7.times do |i|
-    plan.week_events.create!(date: Date.current.beginning_of_week(:monday) + i, event_type: "casual")
-    plan.outfit_recommendations.create!(date: Date.current.beginning_of_week(:monday) + i, event_type: "casual", explanation_status: "ready", preview_status: "none")
+    plan.week_events.create!(date: start + i, event_type: "casual")
+    plan.outfit_recommendations.create!(date: start + i, event_type: "casual", explanation_status: "ready", preview_status: "none")
   end
 end
 
