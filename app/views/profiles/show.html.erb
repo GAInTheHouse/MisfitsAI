@@ -19,7 +19,7 @@
 
   <% if Feature.enabled?(:avatar) %>
     <%= turbo_stream_from current_user, :avatar %>
-    <%= turbo_frame_tag "profile_avatar", src: avatar_path do %>
+    <%= turbo_frame_tag "profile_avatar" do %>
       <%= render "avatars/avatar_section", profile: @profile %>
     <% end %>
   <% end %>
