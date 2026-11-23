@@ -4,7 +4,8 @@ module Avatars
   class GenerateAvatarJob < ApplicationJob
     queue_as :ai_images
 
-    rescue_from(StandardError) do |_e|
+    rescue_from(StandardError) do |error|
+      Rails.logger.error("[Avatars::GenerateAvatarJob] #{error.class}: #{error.message}")
       profile = UserProfile.find_by(id: arguments.first)
       if profile && profile.avatar_status != "ready"
         profile.update!(avatar_status: "failed", avatar_error: "Avatar generation failed. Please try another photo.")
