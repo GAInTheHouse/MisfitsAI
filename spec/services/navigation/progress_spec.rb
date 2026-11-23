@@ -42,13 +42,13 @@ RSpec.describe Navigation do
       end
 
       it "is false when all events are none" do
-        plan = create(:week_plan, user: user, week_start: Date.current.beginning_of_week(:monday))
+        plan = create(:week_plan, user: user, week_start: Planner::Week.current_start(user))
         create(:week_event, week_plan: plan, event_type: "none")
         expect(Navigation.build(user).calendar_complete).to be false
       end
 
       it "is true when at least one event is non-none for the current week" do
-        plan = create(:week_plan, user: user, week_start: Date.current.beginning_of_week(:monday))
+        plan = create(:week_plan, user: user, week_start: Planner::Week.current_start(user))
         create(:week_event, week_plan: plan, event_type: "work_meeting")
         expect(Navigation.build(user).calendar_complete).to be true
       end

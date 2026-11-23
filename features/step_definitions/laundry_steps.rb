@@ -12,11 +12,13 @@ Given("today has a planned casual outfit with {string} and {string}") do |top_na
   plan = FactoryBot.create(:week_plan, user: @user)
   top = @user.garments.find_by!(name: top_name)
   bottom = @user.garments.find_by!(name: bottom_name)
-  @outfit = OutfitRecommendation.create!(week_plan: plan, date: Date.current, event_type: "casual", top:, bottom:)
+  today = Time.current.in_time_zone(@user.time_zone).to_date
+  @outfit = OutfitRecommendation.create!(week_plan: plan, date: today, event_type: "casual", top:, bottom:)
 end
 
 When("I visit today's outfits and confirm wearing the outfit") do
-  visit today_outfits_path(date: Date.current.iso8601)
+  today = Time.current.in_time_zone(@user.time_zone).to_date
+  visit today_outfits_path(date: today.iso8601)
   click_button "I wore this"
 end
 
