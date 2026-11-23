@@ -51,7 +51,7 @@ RSpec.describe Planner::RecommendationEngine, "selection edge cases" do
   end
 
   it "avoids colors the user marked as disliked" do
-    user.profile.update!(avoided_colors: [ "red" ])
+    user.profile.update!(avoided_colors: %w[red])
     red = create(:garment, :top, user:, color_primary: "red", formality: "casual", times_recommended: 0)
     blue = create(:garment, :top, user:, color_primary: "blue", formality: "casual", times_recommended: 0)
     jeans = create(:garment, :bottom, user:, formality: "casual")

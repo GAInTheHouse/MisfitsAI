@@ -155,7 +155,7 @@ module Planner
     end
 
     def color_word_set(colors)
-      colors.flat_map { color_words(_1) }.to_set
+      colors.each_with_object(Set.new) { |color, words| words.merge(color_words(color)) }
     end
 
     def color_score(g)
