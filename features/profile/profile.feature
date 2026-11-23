@@ -43,3 +43,20 @@ Feature: Profile
     Then I should see the Save bar
     When I click "Discard"
     Then the "Gender" field should be reverted
+
+  @javascript
+  Scenario: Swatches highlight immediately on click before saving
+    Given I visit "/profile"
+    When I click the "Medium" skin tone swatch
+    Then the "Medium" skin tone swatch should be highlighted before saving
+    When I click the "Dark" skin tone swatch
+    Then the "Dark" skin tone swatch should be highlighted before saving
+    And the "Medium" skin tone swatch should not be highlighted
+    When I click the "Blue" favorite color swatch
+    And I click the "Green" favorite color swatch
+    Then the "Blue" favorite color swatch should be highlighted before saving
+    And the "Green" favorite color swatch should be highlighted before saving
+    When I click the "Blue" favorite color swatch
+    Then the "Blue" favorite color swatch should not be highlighted
+    When I click the "Red" avoided color swatch
+    Then the "Red" avoided color swatch should be highlighted before saving

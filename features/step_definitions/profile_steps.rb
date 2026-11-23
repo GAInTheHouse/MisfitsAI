@@ -60,3 +60,56 @@ end
 Then("the {string} field should be reverted") do |_field|
   expect(page).not_to have_css("[data-shared--dirty-form-target='bar']:not([hidden])")
 end
+
+When("I click the {string} skin tone swatch") do |label|
+  within "#profile_style" do
+    find("label[title='#{label}'] .swatch").click
+  end
+end
+
+Then("the {string} skin tone swatch should be highlighted before saving") do |label|
+  within "#profile_style" do
+    swatch = find("label[title='#{label}'] .swatch")
+    expect(swatch.evaluate_script("getComputedStyle(this).borderColor")).to eq("rgb(27, 27, 25)")
+  end
+end
+
+Then("the {string} skin tone swatch should not be highlighted") do |label|
+  within "#profile_style" do
+    swatch = find("label[title='#{label}'] .swatch")
+    expect(swatch.evaluate_script("getComputedStyle(this).borderColor")).to eq("rgb(217, 217, 212)")
+  end
+end
+
+When("I click the {string} favorite color swatch") do |color|
+  within "#profile_style" do
+    find("label[title='#{color} (favorite)'] .swatch").click
+  end
+end
+
+Then("the {string} favorite color swatch should be highlighted before saving") do |color|
+  within "#profile_style" do
+    swatch = find("label[title='#{color} (favorite)'] .swatch")
+    expect(swatch.evaluate_script("getComputedStyle(this).borderColor")).to eq("rgb(27, 27, 25)")
+  end
+end
+
+Then("the {string} favorite color swatch should not be highlighted") do |color|
+  within "#profile_style" do
+    swatch = find("label[title='#{color} (favorite)'] .swatch")
+    expect(swatch.evaluate_script("getComputedStyle(this).borderColor")).to eq("rgb(217, 217, 212)")
+  end
+end
+
+When("I click the {string} avoided color swatch") do |color|
+  within "#profile_style" do
+    find("label[title='#{color} (avoided)'] .swatch").click
+  end
+end
+
+Then("the {string} avoided color swatch should be highlighted before saving") do |color|
+  within "#profile_style" do
+    swatch = find("label[title='#{color} (avoided)'] .swatch")
+    expect(swatch.evaluate_script("getComputedStyle(this).borderColor")).to eq("rgb(27, 27, 25)")
+  end
+end
