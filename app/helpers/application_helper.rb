@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 module ApplicationHelper
+  def show_setup_stepper?
+    Feature.enabled?(:onboarding) && current_user.onboarding_completed_at.blank?
+  end
+
   def stepper_step(label, key, complete, path)
     active = current_nav == key
     classes = active ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"
