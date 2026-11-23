@@ -71,7 +71,12 @@ RSpec.describe "Gemini garment images in jobs" do
   end
 
   describe Wardrobe::GenerateDraftImageJob do
-    let(:batch) { create(:intake_batch, user:, status: "ready", progress: 30) }
+    let(:batch) do
+      create(:intake_batch, user:, status: "ready", progress: 30).tap do |b|
+        b.source_file.attach(io: File.open(Rails.root.join("spec/fixtures/files/outfit.jpg")), filename: "outfit.jpg",
+                             content_type: "image/jpeg")
+      end
+    end
     let(:draft) do
       create(:garment_draft, intake_batch: batch, attrs: { "name" => "Straight Jeans", "item_type" => "straight jeans",
                                                            "category" => "bottom", "color_primary" => "blue" })
@@ -84,8 +89,15 @@ RSpec.describe "Gemini garment images in jobs" do
       draft.reload
       expect(draft).to be_ready
       expect(dimensions(draft.image)).to eq([ 512, 512 ])
-      expect(a_request(:post, gemini).with { JSON.parse(_1.body).dig("contents", 0, "parts", 0, "text") == Wardrobe::PhotoIntake::Prompts.product_image(draft.attrs) })
-        .to have_been_made.once
+      request = a_request(:post, gemini).with do |req|
+        body = JSON.parse(req.body)
+        parts = body.dig("contents", 0, "parts") || []
+        text = parts.find { _1["text"] }&.dig("text")
+        has_ref = parts.any? { _1.dig("inlineData", "mimeType") == "image/jpeg" }
+        text == Wardrobe::PhotoIntake::Prompts.reference_flatlay(draft.attrs) && has_ref &&
+          body.dig("generationConfig", "imageConfig", "aspectRatio") == "1:1"
+      end
+      expect(request).to have_been_made.once
     end
 
     it "leaves a committable draft with the placeholder when the image is not an image" do

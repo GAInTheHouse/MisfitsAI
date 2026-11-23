@@ -2,8 +2,8 @@
 
 module Wardrobe
   # Photo intake, step 1 (design doc 6.6): asks Gemini which garments are in the uploaded photo, creates up
-  # to six drafts and queues their product images. The batch always ends ready or failed, and the source
-  # photo is deleted once it has (only the generated images are kept).
+  # to six drafts and queues their product images. The batch always ends ready or failed; the source photo
+  # is kept until GenerateDraftImageJob finishes (or the batch fails).
   class ExtractGarmentsJob < ApplicationJob
     include IntakeBatchJobSupport
 
@@ -50,7 +50,6 @@ module Wardrobe
 
       drafts = create_drafts(items)
       return if drafts.nil? # another run already finished this batch
-      purge_source
       broadcast_batch
       ActiveRecord.after_all_transactions_commit do
         ActiveJob.perform_all_later(drafts.map { Wardrobe::GenerateDraftImageJob.new(_1.id) })

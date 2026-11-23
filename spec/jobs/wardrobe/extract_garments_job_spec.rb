@@ -41,10 +41,14 @@ RSpec.describe Wardrobe::ExtractGarmentsJob do
                                               images_in: 1, user_id: user.id)
   end
 
-  it "deletes the uploaded photo after analysis" do
+  it "keeps the uploaded photo after extraction until draft images finish" do
     run
-    expect(batch.source_file).not_to be_attached
-    expect(ActiveStorage::Blob.count).to eq(0)
+    expect(batch.source_file).to be_attached
+  end
+
+  it "purges the uploaded photo after every draft image job finishes" do
+    perform_enqueued_jobs { described_class.perform_later(batch.id) }
+    expect(batch.reload.source_file).not_to be_attached
   end
 
   it "broadcasts the review to the owner's wardrobe stream" do

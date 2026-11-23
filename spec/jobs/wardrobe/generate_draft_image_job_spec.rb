@@ -6,21 +6,30 @@ RSpec.describe Wardrobe::GenerateDraftImageJob do
   include ActiveJob::TestHelper
 
   let(:user) { create(:user) }
-  let(:batch) { create(:intake_batch, user: user, status: "ready", progress: 30) }
+  let(:batch) do
+    create(:intake_batch, user: user, status: "ready", progress: 30).tap do |b|
+      b.source_file.attach(io: File.open(Rails.root.join("spec/fixtures/files/outfit.jpg")), filename: "outfit.jpg",
+                           content_type: "image/jpeg")
+    end
+  end
   let(:draft) do
     create(:garment_draft, intake_batch: batch, attrs: { "name" => "Straight Jeans", "item_type" => "straight jeans",
                                                          "category" => "bottom", "color_primary" => "blue" })
   end
 
-  def image_calls = Ai::Client::Fake.calls.select { _1[:method] == :generate_image }
+  def multimodal_calls = Ai::Client::Fake.calls.select { _1[:method] == :generate_image_multimodal }
+  def text_image_calls = Ai::Client::Fake.calls.select { _1[:method] == :generate_image }
 
-  it "attaches a product image with the draft prompt and marks the draft ready" do
+  it "attaches a product image from the reference photo and marks the draft ready" do
+    upload_checksum = batch.source_file.blob.checksum
     described_class.perform_now(draft.id)
     draft.reload
     expect(draft).to be_ready
     expect(draft.image).to be_attached
-    expect(image_calls.first).to include(kind: "garment_image", user_id: user.id,
-                                         prompt: Wardrobe::PhotoIntake::Prompts.product_image(draft.attrs))
+    expect(draft.image.blob.checksum).not_to eq(upload_checksum)
+    expect(multimodal_calls.first).to include(kind: "garment_image", user_id: user.id, images_in: 1,
+                                              prompt: Wardrobe::PhotoIntake::Prompts.reference_flatlay(draft.attrs))
+    expect(text_image_calls).to be_empty
   end
 
   it "moves the batch progress towards 100" do
@@ -36,6 +45,22 @@ RSpec.describe Wardrobe::GenerateDraftImageJob do
     expect(streams.map { _1["target"] }).to contain_exactly("image_garment_draft_#{draft.id}", "progress_intake_batch_#{batch.id}")
   end
 
+  it "purges the batch source photo when it is the last pending draft" do
+    other = create(:garment_draft, intake_batch: batch)
+    described_class.perform_now(draft.id)
+    expect(batch.reload.source_file).to be_attached
+    described_class.perform_now(other.id)
+    perform_enqueued_jobs(only: ActiveStorage::PurgeJob)
+    expect(batch.reload.source_file).not_to be_attached
+  end
+
+  it "leaves the placeholder without an AI call when the source photo is missing" do
+    batch.source_file.purge
+    described_class.perform_now(draft.id)
+    expect(draft.reload).to have_attributes(status: "ready", error: "Product image unavailable")
+    expect(multimodal_calls).to be_empty
+  end
+
   [ Ai::ContentBlockedError.new("x"), Ai::QuotaExceededError.new("x"), Ai::DisabledError.new("x") ].each do |error|
     it "leaves a committable draft with the placeholder on #{error.class.name.demodulize}" do
       Ai::Client::Fake.stub(:garment_image, error)
@@ -49,21 +74,21 @@ RSpec.describe Wardrobe::GenerateDraftImageJob do
   it "retries temporary failures three times, then leaves the placeholder" do
     Ai::Client::Fake.stub(:garment_image, Ai::TransientError.new("503"))
     perform_enqueued_jobs { described_class.perform_later(draft.id) }
-    expect(image_calls.size).to eq(3)
+    expect(multimodal_calls.size).to eq(3)
     expect(draft.reload).to have_attributes(status: "ready", error: "Product image unavailable")
   end
 
   it "makes no AI call for a draft that was committed or discarded meanwhile" do
     draft.update!(status: "committed")
     described_class.perform_now(draft.id)
-    expect(image_calls).to be_empty
+    expect(multimodal_calls).to be_empty
     expect(draft.reload).to be_committed
   end
 
   it "does not attach to a draft committed while the AI call was in flight" do
     client = Ai::Client::Fake.new
     allow(Ai::Client).to receive(:current).and_return(client)
-    allow(client).to receive(:generate_image).and_wrap_original do |original, **kwargs|
+    allow(client).to receive(:generate_image_multimodal).and_wrap_original do |original, **kwargs|
       GarmentDraft.find(draft.id).update!(status: "committed")
       original.call(**kwargs)
     end
@@ -87,14 +112,14 @@ RSpec.describe Wardrobe::GenerateDraftImageJob do
       expect(garment.reload).to have_attributes(image_status: "ready")
       expect(garment.image).to be_attached
       expect(draft.reload.image).not_to be_attached
-      expect(image_calls.size).to eq(1)
+      expect(multimodal_calls.size).to eq(1)
     end
 
     it "hands over an image whose AI call was in flight during the commit" do
       client = Ai::Client::Fake.new
       allow(Ai::Client).to receive(:current).and_return(client)
       garment = nil
-      allow(client).to receive(:generate_image).and_wrap_original do |original, **kwargs|
+      allow(client).to receive(:generate_image_multimodal).and_wrap_original do |original, **kwargs|
         garment = committed_garment # the user commits while this call runs
         original.call(**kwargs)
       end
@@ -103,14 +128,15 @@ RSpec.describe Wardrobe::GenerateDraftImageJob do
 
       expect(garment.reload.image).to be_attached
       expect(garment.image_status).to eq("ready")
-      expect(client).to have_received(:generate_image).once
+      expect(client).to have_received(:generate_image_multimodal).once
     end
 
     it "leaves the delayed safety-net job nothing to do, so there is no second AI call" do
       garment = committed_garment
       described_class.perform_now(draft.id)
       Wardrobe::GenerateGarmentImageJob.perform_now(garment.id)
-      expect(image_calls.size).to eq(1)
+      expect(multimodal_calls.size).to eq(1)
+      expect(text_image_calls).to be_empty
     end
 
     it "lets the safety net make the image when the draft job never delivers (e.g. the draft was purged)" do
@@ -119,14 +145,15 @@ RSpec.describe Wardrobe::GenerateDraftImageJob do
       described_class.perform_now(draft.id) # discarded: the draft is gone
       Wardrobe::GenerateGarmentImageJob.perform_now(garment.id)
       expect(garment.reload.image_status).to eq("ready")
-      expect(image_calls.size).to eq(1)
+      expect(multimodal_calls.size).to eq(0)
+      expect(text_image_calls.size).to eq(1)
     end
 
     it "makes no AI call when the garment no longer waits for an image" do
       garment = committed_garment
       garment.update!(image_status: "placeholder")
       described_class.perform_now(draft.id)
-      expect(image_calls).to be_empty
+      expect(multimodal_calls).to be_empty
     end
 
     it "broadcasts the garment card and thumbnail" do
