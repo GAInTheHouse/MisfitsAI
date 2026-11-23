@@ -20,7 +20,7 @@
     <div class="text-center py-8 space-y-3">
       <p class="text-sm text-[var(--muted)]">Generation failed.</p>
       <% if outfit_preview_avatar_ready?(rec) %>
-        <%= button_to "Try again", outfit_preview_path(outfit_id: rec.id),
+        <%= button_to "Try again", outfit_previews_path(outfit_id: rec.id),
               class: "btn-ghost text-sm",
               data: { turbo_frame: dom_id(rec, :on_me) } %>
       <% else %>
@@ -45,7 +45,7 @@
           <% end %>
         </div>
         <%= button_to "Generate look",
-              outfit_preview_path(outfit_id: rec.id),
+              outfit_previews_path(outfit_id: rec.id),
               class: "btn-primary px-5 py-2 text-sm",
               data: { turbo_frame: dom_id(rec, :on_me) } %>
       <% else %>
