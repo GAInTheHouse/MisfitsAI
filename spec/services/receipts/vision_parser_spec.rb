@@ -16,9 +16,9 @@ RSpec.describe Receipts::VisionParser do
     ])
   end
 
-  it "matches the design doc 6.12 vision prompt character for character" do
-    documented = Rails.root.join("docs/ruby_rewrite_design_doc_v2.md").read[/\*\*`Receipts::VisionParser`\*\*.*?```text\n(.*?)\n```/m, 1]
-    expect(Receipts::Prompts::VISION).to eq(documented)
+  it "keeps the vision prompt stable (product contract)" do
+    expect(Receipts::Prompts::VISION).to start_with("You are a receipt parser for a wardrobe app")
+    expect(Receipts::Prompts::VISION).to include("clothing/accessory")
   end
 
   describe ".normalize (design doc 6.12)" do

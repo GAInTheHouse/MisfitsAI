@@ -64,4 +64,3 @@ Then("the user {string} should have Google linked") do |email|
   expect(user.provider).to eq("google_oauth2")
   expect(user.uid).to be_present
 end
-

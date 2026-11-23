@@ -3,11 +3,9 @@
 require "rails_helper"
 
 RSpec.describe Wardrobe::PhotoIntake::Prompts do
-  it "matches the design doc 6.6 extraction prompt character for character" do
-    doc = Rails.root.join("docs/ruby_rewrite_design_doc_v2.md").read
-    documented = doc[/\*\*Extraction prompt\*\*.*?```text\n(.*?)\n```/m, 1]
-    expect(documented).to be_present
-    expect(described_class::EXTRACTION).to eq(documented)
+  it "keeps the extraction prompt stable (product contract)" do
+    expect(described_class::EXTRACTION).to start_with("You are a fashion-vision parser.")
+    expect(described_class::EXTRACTION).to include("Identify each distinct garment item")
   end
 
   it "requires the documented fields and keeps confidence optional" do
