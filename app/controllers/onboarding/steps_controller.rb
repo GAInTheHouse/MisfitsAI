@@ -76,14 +76,14 @@ module Onboarding
 
       items = build_items(catalog, reviewed, custom_items)
 
-      if items.empty?
+      if items.empty? && current_user.garments.none?
         flash.now[:alert] = "Add at least one item to continue."
         @step = 3
         render_step(3)
         return
       end
 
-      Wardrobe::StarterImport.call(user: current_user, items: items)
+      Wardrobe::StarterImport.call(user: current_user, items: items) if items.any?
       plan = Planner::WeekPlanner.ensure_week!(user: current_user)
       Planner::WeekPlanner.apply_demo_week!(plan)
       Planner::WeekPlanner.generate!(user: current_user, week_plan: plan)
