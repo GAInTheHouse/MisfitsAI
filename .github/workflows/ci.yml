@@ -52,6 +52,13 @@ jobs:
       # builds it on test:prepare / assets:precompile, which CI does not run).
       - run: bin/rails tailwindcss:build
       - run: COVERAGE=true bundle exec rspec
+      - name: Upload RSpec coverage
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-rspec
+          path: coverage/.resultset.json
+          include-hidden-files: true
 
   cucumber:
     runs-on: ubuntu-latest
@@ -104,7 +111,14 @@ jobs:
       # After hooks, which the progress formatter does not print.
       - run: |
           mkdir -p tmp/cucumber
-          bundle exec cucumber --format progress --format pretty --out tmp/cucumber/pretty.txt
+          COVERAGE=true bundle exec cucumber --format progress --format pretty --out tmp/cucumber/pretty.txt
+      - name: Upload Cucumber coverage
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-cucumber
+          path: coverage/.resultset.json
+          include-hidden-files: true
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
@@ -112,3 +126,27 @@ jobs:
           path: |
             tmp/cucumber
             tmp/capybara
+
+  coverage:
+    needs: [rspec, cucumber]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.14
+          bundler-cache: true
+      - uses: actions/download-artifact@v7
+        with:
+          name: coverage-rspec
+          path: coverage/rspec
+      - uses: actions/download-artifact@v7
+        with:
+          name: coverage-cucumber
+          path: coverage/cucumber
+      - name: Collate RSpec and Cucumber coverage
+        run: bundle exec ruby script/collate_coverage.rb coverage/rspec/.resultset.json coverage/cucumber/.resultset.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: coverage/

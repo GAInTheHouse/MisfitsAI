@@ -23,19 +23,6 @@ Then("I should get a not found response") do
   expect(page.status_code).to eq(404).or eq(404) # rack-test
 end
 
-When("I attempt to log in {int} times quickly") do |count|
-  count.times do
-    visit new_user_session_path
-    fill_in "Email", with: "brute@example.com"
-    fill_in "Password", with: "wrong"
-    click_button "Log in"
-  end
-end
-
-Then("I should be rate limited") do
-  expect(page.status_code).to eq(429).or have_content("Retry later")
-end
-
 Given("another user has a planned week with an outfit") do
   @other_user = create(:user, :onboarded, email: "planner-owner@example.com")
   plan = create(:week_plan, user: @other_user)

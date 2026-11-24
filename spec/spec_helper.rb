@@ -1,14 +1,8 @@
 # frozen_string_literal: true
 
 if ENV["COVERAGE"]
-  require "simplecov"
-  SimpleCov.start do
-    skip "/spec/"
-    skip do |source_file|
-      !source_file.filename.include?("/app/services/")
-    end
-    minimum_coverage 85
-  end
+  ENV["COVERAGE_COMMAND"] ||= "RSpec"
+  require_relative "support/simplecov"
 end
 
 RSpec.configure do |config|

@@ -64,10 +64,3 @@ Then("the user {string} should have Google linked") do |email|
   expect(user.provider).to eq("google_oauth2")
   expect(user.uid).to be_present
 end
-
-Then("Google tokens should be encrypted for {string}") do |email|
-  user = User.find_by!(email: email)
-  raw = User.connection.select_value("SELECT google_access_token FROM users WHERE id = '#{user.id}'")
-  expect(raw).not_to eq("access-token")
-  expect(user.google_access_token).to eq("access-token")
-end

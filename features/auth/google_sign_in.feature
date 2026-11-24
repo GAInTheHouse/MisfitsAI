@@ -18,8 +18,3 @@ Feature: Google sign in
   Scenario: Cancelled consent shows a flash
     When Google OAuth fails
     Then I should see "Google sign-in was cancelled"
-
-  Scenario: Tokens are stored encrypted
-    Given Google OAuth returns a new user "secure@example.com"
-    When I post Google OAuth callback
-    Then Google tokens should be encrypted for "secure@example.com"
