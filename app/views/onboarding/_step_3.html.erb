@@ -1,6 +1,28 @@
 <h1 class="text-2xl font-semibold mb-2">Review your wardrobe</h1>
 <p class="text-[var(--muted)] mb-6">Edit details for each item, then build your wardrobe.</p>
 
+<% existing_garments = current_user.garments.recent %>
+<% if existing_garments.any? %>
+  <div class="w-full mb-6 space-y-2">
+    <p class="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Already added (<%= existing_garments.size %>)</p>
+    <div class="space-y-2">
+      <% existing_garments.each do |garment| %>
+        <div id="<%= dom_id(garment) %>" class="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-sm">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="font-medium truncate"><%= garment.name %></span>
+            <span class="badge"><%= garment_category_label(garment.category) %></span>
+            <% if garment.color_primary.present? %>
+              <span class="badge"><%= garment.color_primary %></span>
+            <% end %>
+          </div>
+          <%= button_to "Remove", garment_path(garment), method: :delete,
+                class: "text-[var(--muted)] hover:text-red-600 text-xs" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
 <%= form_with url: onboarding_path, method: :patch,
       data: { controller: "shared--nested-rows" },
       class: "w-full space-y-4" do |f| %>

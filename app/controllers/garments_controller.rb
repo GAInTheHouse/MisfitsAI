@@ -29,7 +29,7 @@ class GarmentsController < ApplicationController
       Wardrobe::GenerateGarmentImageJob.perform_later(@garment.id) if params[:generate_image] == "1"
       respond_to do |format|
         format.turbo_stream { flash.now[:notice] = added_notice }
-        format.html { redirect_to wardrobe_path, notice: added_notice }
+        format.html { redirect_to post_intake_path, notice: added_notice }
       end
     else
       respond_to do |format|
@@ -113,5 +113,9 @@ class GarmentsController < ApplicationController
 
   def added_notice
     "Added #{@garment.name} to your wardrobe."
+  end
+
+  def post_intake_path
+    current_user.onboarding_complete? ? wardrobe_path : onboarding_path
   end
 end

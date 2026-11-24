@@ -4,3 +4,7 @@
 <%= turbo_stream.replace "manual_garment_form", partial: "garments/form",
                          locals: { garment: Garment.new(GarmentsController::MANUAL_DEFAULTS) } %>
 <%= turbo_stream.update "flash", partial: "shared/flash" %>
+
+<%= turbo_stream.update "onboarding_garments_count", current_user.garments.count.to_s %>
+
+<%= turbo_stream.update "onboarding_garments_count", current_user.garments.count.to_s %>

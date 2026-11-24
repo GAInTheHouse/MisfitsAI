@@ -33,7 +33,7 @@ module Wardrobe
           flash.now[:notice] = notice
           render "garments/create"
         end
-        format.html { redirect_to wardrobe_path, notice: notice }
+        format.html { redirect_to (current_user.onboarding_complete? ? wardrobe_path : onboarding_path), notice: notice }
       end
     rescue ActiveRecord::RecordInvalid => e
       add_failed(e.record.errors.full_messages.to_sentence)

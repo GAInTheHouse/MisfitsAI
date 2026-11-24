@@ -1,11 +1,82 @@
 <h1 class="text-2xl font-semibold mb-2">What's already in your closet?</h1>
-<p class="text-[var(--muted)] mb-6">Pick the items you own. You can add more from your wardrobe later.</p>
+<p class="text-[var(--muted)] mb-6">Pick starter essentials below, or add your own pieces by search, photo, receipt, or manual entry.</p>
+
+<%= turbo_stream_from current_user, :wardrobe %>
+
+<%# Live preview of items already added via Search, Manual, Photo, or Receipt %>
+<div id="onboarding_added_garments" class="w-full mb-6 <%= "hidden" if current_user.garments.none? %>">
+  <div class="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-semibold">Added to your wardrobe (<span id="onboarding_garments_count"><%= current_user.garments.count %></span>)</p>
+      <span class="text-xs text-[var(--muted)]">Included when you build your wardrobe</span>
+    </div>
+    <div id="wardrobe_grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <% current_user.garments.recent.each do |garment| %>
+        <%= render "garments/garment", garment: garment %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Full Wardrobe Intake Tabs: Search, Manual, Photo, Receipt %>
+<details class="w-full mb-8 rounded-xl border border-[var(--line)] bg-[var(--panel-strong)] p-4" <%= "open" if params[:intake].present? %>>
+  <summary class="cursor-pointer text-sm font-semibold flex items-center justify-between list-none">
+    <span>+ Add your own items (Search, Manual, Photo, or Receipt)</span>
+    <span class="text-xs font-normal text-[var(--muted)]">Expand</span>
+  </summary>
+
+  <div class="mt-4 pt-4 border-t border-[var(--line)]" data-controller="shared--tabs">
+    <div role="tablist" aria-label="Add garment method" class="flex flex-wrap gap-2 mb-4">
+      <button type="button" role="tab" aria-selected="true"
+              data-shared--tabs-target="tab" data-tab="search" data-action="shared--tabs#select"
+              class="pill cursor-pointer">Search</button>
+      <button type="button" role="tab" aria-selected="false"
+              data-shared--tabs-target="tab" data-tab="manual" data-action="shared--tabs#select"
+              class="pill cursor-pointer">Manual</button>
+      <% if Feature.enabled?(:photo_intake) %>
+        <button type="button" role="tab" aria-selected="false"
+                data-shared--tabs-target="tab" data-tab="photo" data-action="shared--tabs#select"
+                class="pill cursor-pointer">Photo</button>
+      <% end %>
+      <% if Feature.enabled?(:receipts) %>
+        <button type="button" role="tab" aria-selected="false"
+                data-shared--tabs-target="tab" data-tab="receipt" data-action="shared--tabs#select"
+                class="pill cursor-pointer">Receipt</button>
+      <% end %>
+    </div>
+
+    <div data-shared--tabs-target="panel" data-tab="search" class="space-y-4">
+      <%= render "wardrobe/searches/form", search: {} %>
+      <%= turbo_frame_tag "garment_search_results" %>
+    </div>
+
+    <div data-shared--tabs-target="panel" data-tab="manual" hidden>
+      <%= render "garments/form", garment: Garment.new(GarmentsController::MANUAL_DEFAULTS) %>
+    </div>
+
+    <% if Feature.enabled?(:photo_intake) %>
+      <div data-shared--tabs-target="panel" data-tab="photo" hidden>
+        <%= turbo_frame_tag "photo_intake" do %>
+          <%= render "wardrobe/photo_intakes/upload_form", error: nil %>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if Feature.enabled?(:receipts) %>
+      <div data-shared--tabs-target="panel" data-tab="receipt" hidden>
+        <%= turbo_frame_tag "receipt_intake" do %>
+          <%= render "wardrobe/receipts/upload_form", error: nil %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</details>
 
 <%= form_with url: onboarding_path, method: :patch, class: "w-full" do |f| %>
   <% catalog.each do |category, items| %>
     <div class="mb-6">
       <p class="text-sm font-semibold uppercase tracking-wide text-[var(--muted)] mb-3">
-        <%= category.capitalize %>s
+        <%= garment_category_plural_label(category) %>
       </p>
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <% items.each do |item| %>

@@ -19,6 +19,10 @@ module GarmentsHelper
     category.to_s.humanize
   end
 
+  def garment_category_plural_label(category)
+    category.to_s == "outerwear" ? "Outerwear" : garment_category_label(category).pluralize
+  end
+
   def garment_option_label(list, key)
     Options.fetch(list).find { |option| option[:key] == key }&.dig(:label)
   end

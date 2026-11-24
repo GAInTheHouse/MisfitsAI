@@ -16,7 +16,7 @@ module Wardrobe
           Receipts::Commit.call(batch: @batch, edits: draft_edits, generate_images: params[:generate_images] == "1")
         end
       notice = garments.any? ? "#{garments.size} #{garments.size == 1 ? 'item' : 'items'} added" : "No new items to add."
-      redirect_to wardrobe_path, notice: notice
+      redirect_to (current_user.onboarding_complete? ? wardrobe_path : onboarding_path), notice: notice
     rescue ActiveRecord::RecordInvalid, Receipts::InvalidEditError => e
       @error = e.is_a?(ActiveRecord::RecordInvalid) ? e.record.errors.full_messages.to_sentence : e.user_message
       @batch.reload
